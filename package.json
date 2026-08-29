@@ -1,0 +1,15 @@
+{
+  "name": "stockpilot",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-Powered Inventory Intelligence & Demand Forecasting Platform",
+  "workspaces": [
+    "apps/frontend",
+    "apps/backend",
+    "packages/*"
+  ],
+  "scripts": {},
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
