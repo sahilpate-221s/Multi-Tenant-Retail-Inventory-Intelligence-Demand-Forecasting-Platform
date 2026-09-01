@@ -1,0 +1,104 @@
+import { Request, Response } from "express";
+import { registerSchema, loginSchema } from "./auth.schema";
+import {
+  registerStoreAndOwner,
+  loginWithCredentials,
+  refreshSession,
+  revokeRefreshToken,
+  AuthError,
+} from "./auth.service";
+
+const REFRESH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/api/auth",
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+};
+
+export async function register(req: Request, res: Response) {
+  const parsed = registerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
+    });
+  }
+
+  try {
+    const { store, user } = await registerStoreAndOwner(parsed.data);
+    return res.status(201).json({
+      success: true,
+      data: { storeId: store.id, userId: user.id, email: user.email },
+    });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return res.status(409).json({ success: false, error: { code: err.code, message: err.message } });
+    }
+    console.error("Registration error:", err);
+    return res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." },
+    });
+  }
+}
+
+export async function login(req: Request, res: Response) {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
+    });
+  }
+
+  try {
+    const { accessToken, refreshTokenPlain, user } = await loginWithCredentials(parsed.data);
+    res.cookie("refreshToken", refreshTokenPlain, REFRESH_COOKIE_OPTIONS);
+    return res.status(200).json({
+      success: true,
+      data: { accessToken, user: { id: user.id, email: user.email, storeId: user.storeId, role: user.role } },
+    });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return res.status(401).json({ success: false, error: { code: err.code, message: err.message } });
+    }
+    console.error("Login error:", err);
+    return res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." },
+    });
+  }
+}
+
+export async function refresh(req: Request, res: Response) {
+  const refreshTokenPlain = req.cookies?.refreshToken;
+
+  if (!refreshTokenPlain) {
+    return res.status(401).json({ success: false, error: { code: "NO_REFRESH_TOKEN", message: "No session found." } });
+  }
+
+  try {
+    const { accessToken, refreshTokenPlain: newRefreshToken, user } = await refreshSession(refreshTokenPlain);
+    res.cookie("refreshToken", newRefreshToken, REFRESH_COOKIE_OPTIONS);
+    return res.status(200).json({
+      success: true,
+      data: { accessToken, user: { id: user.id, email: user.email, storeId: user.storeId, role: user.role } },
+    });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return res.status(401).json({ success: false, error: { code: err.code, message: err.message } });
+    }
+    console.error("Refresh error:", err);
+    return res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Something went wrong." } });
+  }
+}
+
+export async function logout(req: Request, res: Response) {
+  const refreshTokenPlain = req.cookies?.refreshToken;
+  if (refreshTokenPlain) {
+    await revokeRefreshToken(refreshTokenPlain);
+  }
+  res.clearCookie("refreshToken", { path: "/api/auth" });
+  return res.status(200).json({ success: true, data: { message: "Logged out." } });
+}
