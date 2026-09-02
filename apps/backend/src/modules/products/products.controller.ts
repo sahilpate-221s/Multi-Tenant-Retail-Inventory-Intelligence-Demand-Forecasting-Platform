@@ -22,7 +22,7 @@ export async function getProducts(req: Request, res: Response) {
 }
 
 export async function getProduct(req: Request, res: Response) {
-  const product = await getProductById(req.auth!.storeId, req.params.id);
+  const product = await getProductById(req.auth!.storeId, req.params.id as string);
   if (!product) {
     return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
   }
@@ -58,7 +58,7 @@ export async function patchProduct(req: Request, res: Response) {
     });
   }
   try {
-    const product = await updateProduct(req.auth!.storeId, req.params.id, parsed.data);
+    const product = await updateProduct(req.auth!.storeId, req.params.id as string, parsed.data);
     if (!product) {
       return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
     }
@@ -73,7 +73,7 @@ export async function patchProduct(req: Request, res: Response) {
 }
 
 export async function removeProduct(req: Request, res: Response) {
-  const deleted = await deleteProduct(req.auth!.storeId, req.params.id);
+  const deleted = await deleteProduct(req.auth!.storeId, req.params.id as string);
   if (!deleted) {
     return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
   }

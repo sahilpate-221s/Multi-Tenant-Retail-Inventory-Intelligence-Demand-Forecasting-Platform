@@ -27,7 +27,7 @@ export async function patchCategory(req: Request, res: Response) {
       error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
     });
   }
-  const category = await updateCategory(req.auth!.storeId, req.params.id, parsed.data);
+  const category = await updateCategory(req.auth!.storeId, req.params.id as string, parsed.data);
   if (!category) {
     return res.status(404).json({
       success: false,
@@ -38,7 +38,7 @@ export async function patchCategory(req: Request, res: Response) {
 }
 
 export async function removeCategory(req: Request, res: Response) {
-  const deleted = await deleteCategory(req.auth!.storeId, req.params.id);
+  const deleted = await deleteCategory(req.auth!.storeId, req.params.id as string);
   if (!deleted) {
     return res.status(404).json({
       success: false,

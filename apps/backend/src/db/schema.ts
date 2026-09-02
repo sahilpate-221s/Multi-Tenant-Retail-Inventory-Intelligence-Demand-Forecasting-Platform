@@ -7,6 +7,7 @@ import {
   numeric,
   uniqueIndex,
   integer,
+  date, text,
 } from "drizzle-orm/pg-core";
 
 
@@ -151,5 +152,69 @@ export const inventoryMovements = pgTable("inventory_movements", {
   quantityChange: integer("quantity_change").notNull(),
   reason: varchar("reason", { length: 50 }).notNull(),
   note: varchar("note", { length: 500 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const imports = pgTable("imports", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  // pending -> previewed -> processing -> completed | failed
+  totalRows: integer("total_rows").notNull().default(0),
+  successRows: integer("success_rows").notNull().default(0),
+  errorRows: integer("error_rows").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const importErrors = pgTable("import_errors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  importId: uuid("import_id")
+    .notNull()
+    .references(() => imports.id, { onDelete: "cascade" }),
+  rowNumber: integer("row_number").notNull(),
+  rawData: text("raw_data").notNull(),
+  errorMessage: varchar("error_message", { length: 500 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const sales = pgTable("sales", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  importId: uuid("import_id").references(() => imports.id, { onDelete: "set null" }),
+  saleDate: date("sale_date").notNull(),
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const saleItems = pgTable("sale_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  saleId: uuid("sale_id")
+    .notNull()
+    .references(() => sales.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "restrict" }),
+  quantity: integer("quantity").notNull(),
+  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const returns = pgTable("returns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  saleItemId: uuid("sale_item_id")
+    .notNull()
+    .references(() => saleItems.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").notNull(),
+  reason: varchar("reason", { length: 255 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });

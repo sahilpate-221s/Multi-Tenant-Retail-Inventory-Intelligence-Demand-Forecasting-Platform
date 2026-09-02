@@ -1,6 +1,6 @@
 import { eq, and, ilike, asc, desc, sql, SQL } from "drizzle-orm";
 import { db } from "../../db/client";
-import { products, categories } from "../../db/schema";
+import { products, categories, inventory } from "../../db/schema";
 import type { CreateProductInput, UpdateProductInput, ListProductsQuery } from "./products.schema";
 
 export class ProductError extends Error {
@@ -87,6 +87,15 @@ export async function createProduct(storeId: string, input: CreateProductInput) 
         isActive: input.isActive ?? true,
       })
       .returning();
+
+    await db.insert(inventory).values({
+      storeId,
+      productId: product.id,
+      currentStock: 0,
+      minStock: 0,
+      safetyStock: 0,
+    });
+
     return product;
   } catch (err: unknown) {
     if (isUniqueConstraintError(err, "products_store_id_sku_unique")) {

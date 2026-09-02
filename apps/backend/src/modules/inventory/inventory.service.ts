@@ -12,20 +12,32 @@ export class InventoryError extends Error {
 }
 
 export async function listInventory(storeId: string) {
-  return db
+  const rows = await db
     .select({
-      id: inventory.id,
-      productId: inventory.productId,
+      inventoryId: inventory.id,
+      productId: products.id,
       productName: products.name,
       sku: products.sku,
       currentStock: inventory.currentStock,
       minStock: inventory.minStock,
       safetyStock: inventory.safetyStock,
       updatedAt: inventory.updatedAt,
+      productUpdatedAt: products.updatedAt,
     })
-    .from(inventory)
-    .innerJoin(products, eq(inventory.productId, products.id))
-    .where(eq(inventory.storeId, storeId));
+    .from(products)
+    .leftJoin(inventory, and(eq(products.id, inventory.productId), eq(inventory.storeId, storeId)))
+    .where(eq(products.storeId, storeId));
+
+  return rows.map((row) => ({
+    id: row.inventoryId || row.productId,
+    productId: row.productId,
+    productName: row.productName,
+    sku: row.sku,
+    currentStock: row.currentStock ?? 0,
+    minStock: row.minStock ?? 0,
+    safetyStock: row.safetyStock ?? 0,
+    updatedAt: row.updatedAt || row.productUpdatedAt,
+  }));
 }
 
 async function getOrCreateInventoryRow(storeId: string, productId: string) {

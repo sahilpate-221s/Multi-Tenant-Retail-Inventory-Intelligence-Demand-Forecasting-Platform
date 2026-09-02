@@ -32,7 +32,7 @@ export async function postAdjustment(req: Request, res: Response) {
 }
 
 export async function getHistory(req: Request, res: Response) {
-  const history = await getMovementHistory(req.auth!.storeId, req.params.productId);
+  const history = await getMovementHistory(req.auth!.storeId, req.params.productId as string);
   return res.status(200).json({ success: true, data: history });
 }
 
@@ -41,6 +41,6 @@ export async function patchSettings(req: Request, res: Response) {
   if (!parsed.success) {
     return res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message } });
   }
-  const updated = await updateInventorySettings(req.auth!.storeId, req.params.productId, parsed.data);
+  const updated = await updateInventorySettings(req.auth!.storeId, req.params.productId as string, parsed.data);
   return res.status(200).json({ success: true, data: updated });
 }
