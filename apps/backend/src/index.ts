@@ -11,6 +11,8 @@ import suppliersRoutes from "./modules/suppliers/suppliers.routes";
 import inventoryRoutes from "./modules/inventory/inventory.routes";
 import importsRoutes from "./modules/imports/imports.routes";
 import "./modules/imports/importWorker";
+import analyticsRoutes from "./modules/analytics/analytics.routes";
+
 
 dotenv.config();
 
@@ -39,6 +41,8 @@ app.use("/api/products", productsRoutes);
 app.use("/api/suppliers", suppliersRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/imports", importsRoutes);
+app.use("/api/analytics", analyticsRoutes);
+
 
 app.listen(PORT, () => {
   console.log(`StockPilot backend running on http://localhost:${PORT}`);

@@ -218,3 +218,20 @@ export const returns = pgTable("returns", {
   reason: varchar("reason", { length: 255 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  supplierId: uuid("supplier_id").references(() => suppliers.id, { onDelete: "set null" }),
+  quantity: integer("quantity").notNull(),
+  expectedArrivalDate: date("expected_arrival_date").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | received | cancelled
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  receivedAt: timestamp("received_at"),
+});
