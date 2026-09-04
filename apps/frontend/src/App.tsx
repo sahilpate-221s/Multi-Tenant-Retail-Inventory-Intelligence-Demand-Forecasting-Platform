@@ -1,6 +1,7 @@
 import { useRoutes, Navigate } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import { routes } from "./routes";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const { authRoutes, appRoutes } = routes.reduce<{
   authRoutes: typeof routes;
@@ -21,7 +22,11 @@ function App() {
   const element = useRoutes([
     ...authRoutes,
     {
-      element: <AppLayout />,
+      element: (
+        <ProtectedRoute>
+          <AppLayout />
+        </ProtectedRoute>
+      ),
       children: appRoutes,
     },
     { path: "/", element: <Navigate to="/dashboard" replace /> },

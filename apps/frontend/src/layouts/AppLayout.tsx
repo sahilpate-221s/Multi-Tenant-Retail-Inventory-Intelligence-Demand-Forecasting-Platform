@@ -1,9 +1,11 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useAuth } from "../lib/authContext";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/products", label: "Products" },
   { to: "/inventory", label: "Inventory" },
+  { to: "/suppliers", label: "Suppliers" },
   { to: "/sales", label: "Sales" },
   { to: "/import", label: "Import" },
   { to: "/forecasts", label: "Forecasts" },
@@ -18,6 +20,9 @@ const navItems = [
 ];
 
 function AppLayout() {
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen flex bg-slate-50">
       <aside className="w-64 shrink-0 border-r border-slate-200 bg-white">
@@ -44,9 +49,23 @@ function AppLayout() {
       <div className="flex-1 flex flex-col">
         <header className="h-14 flex items-center justify-between px-6 border-b border-slate-200 bg-white">
           <span className="text-sm text-slate-500">Small Grocery Store Demo</span>
-          <span className="text-xs font-medium px-2 py-1 rounded bg-status-success-bg text-status-success">
-            System Healthy
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-medium px-2 py-1 rounded bg-status-success-bg text-status-success">
+              System Healthy
+            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-slate-400">{user?.email}</span>
+              <button
+                onClick={async () => {
+                  await logout();
+                  navigate("/login");
+                }}
+                className="text-xs text-slate-500 hover:text-slate-800 underline"
+              >
+                Log out
+              </button>
+            </div>
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto">
           <Outlet />
@@ -55,5 +74,6 @@ function AppLayout() {
     </div>
   );
 }
+
 
 export default AppLayout;
