@@ -12,6 +12,9 @@ import inventoryRoutes from "./modules/inventory/inventory.routes";
 import importsRoutes from "./modules/imports/imports.routes";
 import "./modules/imports/importWorker";
 import analyticsRoutes from "./modules/analytics/analytics.routes";
+import purchaseOrdersRoutes from "./modules/purchaseOrders/purchaseOrders.routes";
+import intelligenceRoutes from "./modules/intelligence/intelligence.routes";
+import recommendationsRoutes from "./modules/recommendations/recommendations.routes";
 
 
 dotenv.config();
@@ -42,6 +45,9 @@ app.use("/api/suppliers", suppliersRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/imports", importsRoutes);
 app.use("/api/analytics", analyticsRoutes);
+app.use("/api/purchase-orders", purchaseOrdersRoutes);
+app.use("/api/intelligence", intelligenceRoutes);
+app.use("/api/recommendations", recommendationsRoutes);
 
 
 app.listen(PORT, () => {

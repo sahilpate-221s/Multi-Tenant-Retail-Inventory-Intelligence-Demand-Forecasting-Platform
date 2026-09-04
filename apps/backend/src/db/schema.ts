@@ -235,3 +235,25 @@ export const purchaseOrders = pgTable("purchase_orders", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   receivedAt: timestamp("received_at"),
 });
+
+export const reorderRecommendations = pgTable("reorder_recommendations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  currentStock: integer("current_stock").notNull(),
+  incomingStock: integer("incoming_stock").notNull(),
+  averageDailyDemand: numeric("average_daily_demand", { precision: 10, scale: 3 }).notNull(),
+  leadTimeDays: integer("lead_time_days"),
+  safetyStock: integer("safety_stock").notNull(),
+  reorderPoint: integer("reorder_point"),
+  recommendedQuantity: integer("recommended_quantity").notNull(),
+  daysUntilStockout: numeric("days_until_stockout", { precision: 10, scale: 1 }),
+  reasonCodes: text("reason_codes").notNull(), // JSON array, stored as text
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | ordered | dismissed
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+});
