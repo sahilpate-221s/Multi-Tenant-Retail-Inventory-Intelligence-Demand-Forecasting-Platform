@@ -15,6 +15,8 @@ import analyticsRoutes from "./modules/analytics/analytics.routes";
 import purchaseOrdersRoutes from "./modules/purchaseOrders/purchaseOrders.routes";
 import intelligenceRoutes from "./modules/intelligence/intelligence.routes";
 import recommendationsRoutes from "./modules/recommendations/recommendations.routes";
+import deadStockRoutes from "./modules/deadStock/deadStock.routes";
+import forecastingRoutes from "./modules/forecasting/forecasting.routes";
 
 
 dotenv.config();
@@ -48,6 +50,8 @@ app.use("/api/analytics", analyticsRoutes);
 app.use("/api/purchase-orders", purchaseOrdersRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
 app.use("/api/recommendations", recommendationsRoutes);
+app.use("/api/dead-stock", deadStockRoutes);
+app.use("/api/forecasting", forecastingRoutes);
 
 
 app.listen(PORT, () => {

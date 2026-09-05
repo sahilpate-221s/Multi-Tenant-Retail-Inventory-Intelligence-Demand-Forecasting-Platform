@@ -8,8 +8,18 @@
     "apps/backend",
     "packages/*"
   ],
-  "scripts": {},
+  "scripts": {
+    "lint:frontend": "npm run lint --workspace=apps/frontend",
+    "lint:backend": "npm run lint --workspace=apps/backend",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,js,json}\"",
+    "test:frontend": "npm run test --workspace=apps/frontend",
+    "test:backend": "npm run test --workspace=apps/backend"
+  },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6"
   }
 }

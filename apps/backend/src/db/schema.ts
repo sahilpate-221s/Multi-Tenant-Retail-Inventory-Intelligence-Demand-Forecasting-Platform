@@ -257,3 +257,38 @@ export const reorderRecommendations = pgTable("reorder_recommendations", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   resolvedAt: timestamp("resolved_at"),
 });
+
+export const deadStockScores = pgTable("dead_stock_scores", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  score: integer("score").notNull(),
+  daysSinceLastSale: integer("days_since_last_sale"),
+  currentStock: integer("current_stock").notNull(),
+  inventoryValue: numeric("inventory_value", { precision: 12, scale: 2 }).notNull(),
+  averageDailyDemand: numeric("average_daily_demand", { precision: 10, scale: 3 }).notNull(),
+  reasonCodes: text("reason_codes").notNull(),
+  calculatedAt: timestamp("calculated_at").notNull().defaultNow(),
+});
+
+export const forecastRuns = pgTable("forecast_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  horizonDays: integer("horizon_days").notNull(), // 7 or 30
+  forecastedDailyDemand: numeric("forecasted_daily_demand", { precision: 10, scale: 3 }).notNull(),
+  forecastedTotalDemand: numeric("forecasted_total_demand", { precision: 10, scale: 3 }).notNull(),
+  modelUsed: varchar("model_used", { length: 100 }).notNull(),
+  confidence: varchar("confidence", { length: 20 }).notNull(), // low | medium | high
+  daysOfHistoryUsed: integer("days_of_history_used").notNull(),
+  modelScoresSnapshot: text("model_scores_snapshot").notNull(), // JSON, for auditability
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+});
