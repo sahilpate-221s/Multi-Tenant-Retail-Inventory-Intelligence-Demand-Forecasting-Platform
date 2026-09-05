@@ -11,6 +11,11 @@ import ImportDetailPage from "./pages/ImportDetailPage";
 import DashboardPage from "./pages/DashboardPage";
 import RecommendationsPage from "./pages/RecommendationsPage";
 import DeadStockPage from "./pages/DeadStockPage";
+import ForecastsListPage from "./pages/ForecastsListPage";
+import ForecastDetailPage from "./pages/ForecastDetailPage";
+
+
+
 
 export const routes: RouteObject[] = [
  { path: "/login", element: <LoginPage /> },
@@ -30,11 +35,8 @@ export const routes: RouteObject[] = [
   { path: "/import/:id", element: <ImportDetailPage /> },
 
   { path: "/sales", element: <PlaceholderPage title="Sales" phase="Phase 5" /> },
-  { path: "/forecasts", element: <PlaceholderPage title="Forecasts" phase="Phase 11" /> },
-  {
-    path: "/forecasts/:productId",
-    element: <PlaceholderPage title="Forecast Detail" phase="Phase 11" />,
-  },
+  { path: "/forecasts", element: <ForecastsListPage /> },
+  { path: "/forecasts/:productId", element: <ForecastDetailPage /> },
   { path: "/stockout-risks", element: <PlaceholderPage title="Stockout Risks" phase="Phase 12" /> },
   { path: "/dead-stock", element: <DeadStockPage /> },
   { path: "/reorder-recommendations", element: <RecommendationsPage /> },

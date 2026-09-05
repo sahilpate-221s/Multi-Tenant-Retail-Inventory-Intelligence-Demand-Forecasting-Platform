@@ -156,3 +156,22 @@ export interface DeadStockScore {
   reasonCodes: string[];
   calculatedAt: string;
 }
+export interface ModelScore {
+  model: string;
+  mae: number;
+  rmse: number;
+  wape: number | null;
+}
+
+export interface ForecastRun {
+  id: string;
+  productId: string;
+  horizonDays: number;
+  forecastedDailyDemand: string;
+  forecastedTotalDemand: string;
+  modelUsed: string;
+  confidence: "low" | "medium" | "high";
+  daysOfHistoryUsed: number;
+  modelScoresSnapshot: string;
+  generatedAt: string;
+}
