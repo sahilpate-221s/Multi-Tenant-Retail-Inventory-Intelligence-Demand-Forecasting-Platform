@@ -23,12 +23,16 @@ import returnsRoutes from "./modules/returns/returns.routes";
 import simulatorRoutes from "./modules/simulator/simulator.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes"
 import aiRoutes from "./modules/ai/ai.routes";
+import { authRateLimiter, aiRateLimiter, generalRateLimiter } from "./middleware/rateLimiters";
+
 
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+
+
 
 app.use(helmet());
 // app.use(cors());
@@ -44,7 +48,9 @@ app.get("/health", (_req, res) => {
   });
 });
 
-
+app.use("/api", generalRateLimiter);
+app.use("/api/auth", authRateLimiter, authRoutes);
+app.use("/api/ai", aiRateLimiter, aiRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/stores", storesRoutes);
 app.use("/api/categories", categoriesRoutes);
