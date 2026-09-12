@@ -1,4 +1,4 @@
-import { useRoutes, Navigate } from "react-router-dom";
+import { useRoutes } from "react-router-dom";
 import AppLayout from "./layouts/AppLayout";
 import { routes } from "./routes";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -8,7 +8,7 @@ const { authRoutes, appRoutes } = routes.reduce<{
   appRoutes: typeof routes;
 }>(
   (acc, route) => {
-    if (route.path === "/login" || route.path === "/register") {
+    if (route.path === "/login" || route.path === "/register" || route.path === "/") {
       acc.authRoutes.push(route);
     } else {
       acc.appRoutes.push(route);
@@ -29,8 +29,7 @@ function App() {
       ),
       children: appRoutes,
     },
-    { path: "/", element: <Navigate to="/dashboard" replace /> },
-    { path: "*", element: <div className="p-8">404 — Page not found</div> },
+    { path: "*", element: <div className="p-8 text-[#97979d]">404 — Page not found</div> },
   ]);
 
   return element;

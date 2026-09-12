@@ -40,64 +40,77 @@ function ProductsListPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-800">Products</h1>
-        <div className="flex gap-2">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      {/* Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[#d4a853]">
+            INVENTORY CATALOG
+          </span>
+          <h1 className="text-xl md:text-2xl font-bold text-[#e8e6e3] mt-0.5">
+            Products & SKUs
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => setShowCategoryManager(true)}
-            className="text-sm px-3 py-1.5 border border-slate-300 rounded-md text-slate-600"
+            className="text-xs font-mono px-3.5 py-2 border border-[rgba(255,255,255,0.08)] bg-[#1a1a22] hover:bg-[#22222c] hover:border-[rgba(212,168,83,0.3)] rounded-lg text-[#e8e6e3] transition-all"
           >
             Manage Categories
           </button>
           <button
             onClick={() => setEditingProduct(null)}
-            className="text-sm px-3 py-1.5 bg-slate-900 text-white rounded-md"
+            className="text-xs font-mono font-semibold px-4 py-2 bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] rounded-lg transition-all shadow-[0_0_15px_rgba(212,168,83,0.2)] active:scale-95"
           >
             + New Product
           </button>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      {/* Filter Controls Bar */}
+      <div className="mt-6 flex flex-wrap items-center gap-3">
         <input
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          placeholder="Search by name..."
-          className="border border-slate-300 rounded-md px-3 py-1.5 text-sm w-56"
+          placeholder="Search by name or SKU..."
+          className="bg-[#0f0f13] border border-[rgba(255,255,255,0.08)] focus:border-[#d4a853] rounded-lg px-3.5 py-2 text-xs font-mono text-[#e8e6e3] placeholder-[#5c5c64] w-64 outline-none transition-colors"
         />
         <select
           value={categoryId}
           onChange={(e) => { setCategoryId(e.target.value); setPage(1); }}
-          className="border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+          className="bg-[#0f0f13] border border-[rgba(255,255,255,0.08)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-xs font-mono text-[#e8e6e3] outline-none transition-colors"
         >
-          <option value="">All categories</option>
+          <option value="" className="bg-[#121216] text-[#e8e6e3]">All categories</option>
           {categories?.map((cat) => (
-            <option key={cat.id} value={cat.id}>{cat.name}</option>
+            <option key={cat.id} value={cat.id} className="bg-[#121216] text-[#e8e6e3]">
+              {cat.name}
+            </option>
           ))}
         </select>
         <select
           value={isActive}
           onChange={(e) => { setIsActive(e.target.value as "" | "true" | "false"); setPage(1); }}
-          className="border border-slate-300 rounded-md px-3 py-1.5 text-sm"
+          className="bg-[#0f0f13] border border-[rgba(255,255,255,0.08)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-xs font-mono text-[#e8e6e3] outline-none transition-colors"
         >
-          <option value="">All statuses</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
+          <option value="" className="bg-[#121216] text-[#e8e6e3]">All statuses</option>
+          <option value="true" className="bg-[#121216] text-[#e8e6e3]">Active</option>
+          <option value="false" className="bg-[#121216] text-[#e8e6e3]">Inactive</option>
         </select>
       </div>
 
-      <div className="mt-4 border border-slate-200 rounded-lg bg-white overflow-hidden">
-        {isLoading && <LoadingState message="Loading products..." />}
+      {/* Main Table Container */}
+      <div className="mt-5 border border-[rgba(255,255,255,0.08)] rounded-xl bg-[#121216]/90 backdrop-blur-xl overflow-hidden shadow-2xl">
+        {isLoading && <LoadingState message="Loading products catalog..." />}
         {isError && <ErrorState onRetry={() => refetch()} />}
         {data && data.items.length === 0 && (
           <EmptyState
-            title="No products yet"
-            description="Add your first product to get started."
+            title="No products found"
+            description="Add your first physical SKU to begin tracking inventory."
             action={
               <button
                 onClick={() => setEditingProduct(null)}
-                className="text-sm px-3 py-1.5 bg-slate-900 text-white rounded-md"
+                className="text-xs font-mono font-semibold px-4 py-2 bg-[#d4a853] text-[#0c0c0e] rounded-lg"
               >
                 + New Product
               </button>
@@ -105,54 +118,88 @@ function ProductsListPage() {
           />
         )}
         {data && data.items.length > 0 && (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-left">
-              <tr>
-                <th className="px-4 py-2 cursor-pointer" onClick={() => toggleSort("name")}>Name</th>
-                <th className="px-4 py-2 cursor-pointer" onClick={() => toggleSort("sku")}>SKU</th>
-                <th className="px-4 py-2 cursor-pointer" onClick={() => toggleSort("sellingPrice")}>Price</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((product) => (
-                <tr key={product.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2">
-                    <Link to={`/products/${product.id}`} className="text-slate-800 hover:underline">
-                      {product.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2 text-slate-500">{product.sku}</td>
-                  <td className="px-4 py-2">₹{product.sellingPrice}</td>
-                  <td className="px-4 py-2">
-                    <span className={`text-xs px-2 py-0.5 rounded ${product.isActive ? "bg-status-success-bg text-status-success" : "bg-slate-100 text-slate-500"}`}>
-                      {product.isActive ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-right">
-                    <button onClick={() => setEditingProduct(product)} className="text-xs text-slate-500 hover:underline mr-3">
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => { if (confirm(`Delete ${product.name}?`)) deleteProduct.mutate(product.id); }}
-                      className="text-xs text-status-danger hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-[#16161d] text-[#97979d] border-b border-[rgba(255,255,255,0.08)] uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="px-5 py-3 cursor-pointer select-none hover:text-[#e8e6e3]" onClick={() => toggleSort("name")}>
+                    Product Name {sortBy === "name" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th className="px-5 py-3 cursor-pointer select-none hover:text-[#e8e6e3]" onClick={() => toggleSort("sku")}>
+                    SKU Code {sortBy === "sku" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th className="px-5 py-3 cursor-pointer select-none hover:text-[#e8e6e3]" onClick={() => toggleSort("sellingPrice")}>
+                    Price {sortBy === "sellingPrice" && (sortOrder === "asc" ? "↑" : "↓")}
+                  </th>
+                  <th className="px-5 py-3">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[rgba(255,255,255,0.04)]">
+                {data.items.map((product) => (
+                  <tr key={product.id} className="hover:bg-[#181822]/70 transition-colors group">
+                    <td className="px-5 py-3.5">
+                      <Link to={`/products/${product.id}`} className="font-semibold text-[#e8e6e3] hover:text-[#d4a853] transition-colors">
+                        {product.name}
+                      </Link>
+                    </td>
+                    <td className="px-5 py-3.5 text-[#97979d]">{product.sku}</td>
+                    <td className="px-5 py-3.5 text-[#d4a853] font-semibold tabular-nums">
+                      ₹{Number(product.sellingPrice).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                          product.isActive
+                            ? "bg-[#4aba7a]/15 text-[#4aba7a] border-[#4aba7a]/30"
+                            : "bg-[#25252d] text-[#97979d] border-[#303035]"
+                        }`}
+                      >
+                        {product.isActive ? "ACTIVE" : "INACTIVE"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={() => setEditingProduct(product)}
+                        className="text-xs text-[#97979d] hover:text-[#d4a853] transition-colors mr-3"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`Delete ${product.name}?`)) deleteProduct.mutate(product.id); }}
+                        className="text-xs text-[#d45a4a] hover:text-red-400 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
+      {/* Pagination Bar */}
       {data && data.pagination.totalPages > 1 && (
-        <div className="mt-3 flex items-center gap-2 text-sm text-slate-500">
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="disabled:opacity-30">Previous</button>
+        <div className="mt-4 flex items-center justify-between text-xs font-mono text-[#97979d]">
           <span>Page {data.pagination.page} of {data.pagination.totalPages}</span>
-          <button disabled={page >= data.pagination.totalPages} onClick={() => setPage(page + 1)} className="disabled:opacity-30">Next</button>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(page - 1)}
+              className="px-3 py-1.5 rounded bg-[#181820] border border-[rgba(255,255,255,0.08)] text-[#e8e6e3] disabled:opacity-30 hover:bg-[#20202a] transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              disabled={page >= data.pagination.totalPages}
+              onClick={() => setPage(page + 1)}
+              className="px-3 py-1.5 rounded bg-[#181820] border border-[rgba(255,255,255,0.08)] text-[#e8e6e3] disabled:opacity-30 hover:bg-[#20202a] transition-colors"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 

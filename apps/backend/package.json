@@ -35,6 +35,7 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@google/genai": "^2.21.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^6.3.4",
     "cookie-parser": "^1.4.7",
@@ -47,6 +48,7 @@
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
+    "openai": "^7.10.0",
     "postgres": "^3.4.9",
     "zod": "^4.5.4"
   }

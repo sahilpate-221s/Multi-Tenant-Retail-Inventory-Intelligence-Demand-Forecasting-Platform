@@ -292,3 +292,104 @@ export const forecastRuns = pgTable("forecast_runs", {
   modelScoresSnapshot: text("model_scores_snapshot").notNull(), // JSON, for auditability
   generatedAt: timestamp("generated_at").notNull().defaultNow(),
 });
+
+export const stockoutPredictions = pgTable("stockout_predictions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  currentStock: integer("current_stock").notNull(),
+  incomingStock: integer("incoming_stock").notNull(),
+  forecastedDailyDemand: numeric("forecasted_daily_demand", { precision: 10, scale: 3 }).notNull(),
+  demandSource: varchar("demand_source", { length: 30 }).notNull(), // "forecast" | "historical_average"
+  leadTimeDays: integer("lead_time_days"),
+  daysUntilStockout: numeric("days_until_stockout", { precision: 10, scale: 1 }),
+  riskLevel: varchar("risk_level", { length: 20 }).notNull(), // critical | high | moderate | low
+  calculatedAt: timestamp("calculated_at").notNull().defaultNow(),
+});
+
+export const anomalies = pgTable("anomalies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  anomalyType: varchar("anomaly_type", { length: 30 }).notNull(), // "demand" | "return"
+  direction: varchar("direction", { length: 10 }).notNull(), // spike | drop
+  severity: varchar("severity", { length: 20 }).notNull(),
+  observedValue: numeric("observed_value", { precision: 10, scale: 3 }).notNull(),
+  baselineMean: numeric("baseline_mean", { precision: 10, scale: 3 }).notNull(),
+  zScore: numeric("z_score", { precision: 10, scale: 3 }),
+  possibleCauses: text("possible_causes").notNull(), // JSON array
+  detectedAt: timestamp("detected_at").notNull().defaultNow(),
+});
+
+export const simulations = pgTable("simulations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "cascade" }),
+  // Inputs — the hypothetical scenario, stored so a run is reproducible/auditable
+  demandChangePercent: numeric("demand_change_percent", { precision: 6, scale: 2 }).notNull().default("0"),
+  supplierDelayDays: integer("supplier_delay_days").notNull().default(0),
+  budgetLimit: numeric("budget_limit", { precision: 12, scale: 2 }),
+  // Baseline snapshot — the real data this simulation was run against,
+  // so the result is auditable even if real data later changes
+  baselineCurrentStock: integer("baseline_current_stock").notNull(),
+  baselineAverageDailyDemand: numeric("baseline_average_daily_demand", { precision: 10, scale: 3 }).notNull(),
+  baselineLeadTimeDays: integer("baseline_lead_time_days"),
+  // Outputs
+  simulatedAverageDailyDemand: numeric("simulated_average_daily_demand", { precision: 10, scale: 3 }).notNull(),
+  simulatedLeadTimeDays: integer("simulated_lead_time_days"),
+  simulatedSafetyStock: integer("simulated_safety_stock").notNull(),
+  simulatedReorderPoint: integer("simulated_reorder_point"),
+  simulatedRecommendedQuantity: integer("simulated_recommended_quantity").notNull(),
+  simulatedDaysUntilStockout: numeric("simulated_days_until_stockout", { precision: 10, scale: 1 }),
+  estimatedCost: numeric("estimated_cost", { precision: 12, scale: 2 }),
+  budgetExceeded: boolean("budget_exceeded").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(),
+  // STOCKOUT_RISK | LOW_STOCK | DEAD_STOCK | DEMAND_ANOMALY |
+  // IMPORT_COMPLETED | IMPORT_FAILED | FORECAST_READY | REORDER_RECOMMENDATION
+  title: varchar("title", { length: 255 }).notNull(),
+  message: varchar("message", { length: 500 }).notNull(),
+  relatedProductId: uuid("related_product_id").references(() => products.id, { onDelete: "cascade" }),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+
+export const conversations = pgTable("conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id")
+    .notNull()
+    .references(() => stores.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const conversationMessages = pgTable("conversation_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
+    .notNull()
+    .references(() => conversations.id, { onDelete: "cascade" }),
+  role: varchar("role", { length: 20 }).notNull(), // "user" | "assistant"
+  content: text("content").notNull(),
+  toolsUsed: text("tools_used"), // JSON array, nullable
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});

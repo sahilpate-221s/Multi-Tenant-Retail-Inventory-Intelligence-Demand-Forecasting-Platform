@@ -12,32 +12,54 @@ function ForecastsListPage() {
   });
 
   return (
-    <div className="p-8">
-      <h1 className="text-xl font-semibold text-slate-800">Forecasts</h1>
-      <p className="mt-1 text-sm text-slate-500">Select a product to view or generate its demand forecast.</p>
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <div>
+        <span className="text-[10px] font-mono uppercase tracking-widest text-[#d4a853]">
+          PREDICTIVE VECTORS
+        </span>
+        <h1 className="text-xl md:text-2xl font-bold text-[#e8e6e3] mt-0.5">
+          Demand Forecasting Hub
+        </h1>
+        <p className="mt-1 text-xs font-mono text-[#97979d]">
+          Select an SKU to inspect algorithmic demand projections and confidence intervals.
+        </p>
+      </div>
 
-      <div className="mt-4 border border-slate-200 rounded-lg bg-white overflow-hidden">
-        {isLoading && <LoadingState message="Loading products..." />}
-        {products?.length === 0 && <EmptyState title="No products yet" />}
+      {/* Main Table */}
+      <div className="mt-6 border border-[rgba(255,255,255,0.08)] rounded-xl bg-[#121216]/90 backdrop-blur-xl overflow-hidden shadow-2xl">
+        {isLoading && <LoadingState message="Loading catalog for forecasting..." />}
+        {products?.length === 0 && <EmptyState title="No products found" />}
         {products && products.length > 0 && (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-left">
-              <tr><th className="px-4 py-2">Product</th><th className="px-4 py-2">SKU</th><th className="px-4 py-2"></th></tr>
-            </thead>
-            <tbody>
-              {products.map((p) => (
-                <tr key={p.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2">{p.name}</td>
-                  <td className="px-4 py-2 text-slate-500">{p.sku}</td>
-                  <td className="px-4 py-2 text-right">
-                    <Link to={`/forecasts/${p.id}`} className="text-xs text-slate-800 hover:underline">
-                      View Forecast →
-                    </Link>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-[#16161d] text-[#97979d] border-b border-[rgba(255,255,255,0.08)] uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="px-5 py-3">Product Name</th>
+                  <th className="px-5 py-3">SKU Code</th>
+                  <th className="px-5 py-3 text-right">Forecast Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[rgba(255,255,255,0.04)]">
+                {products.map((p) => (
+                  <tr key={p.id} className="hover:bg-[#181822]/70 transition-colors group">
+                    <td className="px-5 py-3.5 font-semibold text-[#e8e6e3]">
+                      {p.name}
+                    </td>
+                    <td className="px-5 py-3.5 text-[#97979d]">{p.sku}</td>
+                    <td className="px-5 py-3.5 text-right">
+                      <Link
+                        to={`/forecasts/${p.id}`}
+                        className="px-3 py-1.5 rounded-lg bg-[#1a1a22] hover:bg-[#252530] text-[#d4a853] hover:text-[#e8be66] border border-[rgba(212,168,83,0.3)] transition-all font-semibold inline-block"
+                      >
+                        Inspect Projections →
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>

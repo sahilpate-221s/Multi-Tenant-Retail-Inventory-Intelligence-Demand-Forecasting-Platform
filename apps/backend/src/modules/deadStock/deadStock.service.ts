@@ -3,6 +3,7 @@ import { db } from "../../db/client";
 import { products, inventory, sales, saleItems, deadStockScores } from "../../db/schema";
 import { calculateDeadStockScore } from "./deadStockScoring";
 import { getDemandVelocityForProduct } from "../intelligence/intelligence.service";
+import { createNotification } from "../notifications/notifications.service";
 
 export async function generateDeadStockScores(storeId: string) {
   const activeProducts = await db.query.products.findMany({
@@ -41,6 +42,16 @@ export async function generateDeadStockScores(storeId: string) {
     });
 
     const inventoryValue = currentStock * Number(product.costPrice);
+
+    if (score >= 70) {
+      await createNotification(
+        storeId,
+        "DEAD_STOCK",
+        `${product.name} — high dead stock score`,
+        `Score: ${score}/100. ₹${inventoryValue.toFixed(2)} in capital may be tied up in slow-moving stock.`,
+        product.id,
+      );
+    }
 
     // Replace any existing score for this product with a fresh
     // snapshot — dead stock scores represent "current state," not a

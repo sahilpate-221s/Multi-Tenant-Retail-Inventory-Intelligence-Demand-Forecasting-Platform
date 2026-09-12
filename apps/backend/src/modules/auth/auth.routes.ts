@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { register, login, refresh, logout } from "./auth.controller";
+import { register, login, refresh, logout, changePassword } from "./auth.controller";
 import { requireAuth } from "./auth.middleware";
 
 const router = Router();
@@ -8,6 +8,7 @@ router.post("/register", register);
 router.post("/login", login);
 router.post("/refresh", refresh);
 router.post("/logout", logout);
+router.post("/change-password", requireAuth, changePassword);
 
 // A simple protected test route — proves the middleware actually works.
 // This isn't a permanent endpoint; it's scaffolding to verify Step 5+6

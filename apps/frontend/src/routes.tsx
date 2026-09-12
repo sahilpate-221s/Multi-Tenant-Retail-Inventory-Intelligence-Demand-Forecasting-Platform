@@ -1,7 +1,5 @@
 import type { RouteObject } from "react-router-dom";
 import PlaceholderPage from "./pages/PlaceholderPage";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
 import ProductsListPage from "./pages/ProductsListPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import SuppliersPage from "./pages/SuppliersPage";
@@ -13,13 +11,25 @@ import RecommendationsPage from "./pages/RecommendationsPage";
 import DeadStockPage from "./pages/DeadStockPage";
 import ForecastsListPage from "./pages/ForecastsListPage";
 import ForecastDetailPage from "./pages/ForecastDetailPage";
+import StockoutRisksPage from "./pages/StockoutRisksPage";
+import AnomaliesPage from "./pages/AnomaliesPage";
+import SimulatorPage from "./pages/SimulatorPage";
+import NotificationsPage from "./pages/NotificationsPage";
+import AIAssistantPage from "./pages/AIAssistantPage";
 
 
 
+
+
+
+import LandingPage from "./pages/LandingPage";
+import AuthPage from "./pages/AuthPage";
+import SettingsPage from "./pages/SettingsPage";
 
 export const routes: RouteObject[] = [
- { path: "/login", element: <LoginPage /> },
-  { path: "/register", element: <RegisterPage /> },
+  { path: "/", element: <LandingPage /> },
+  { path: "/login", element: <AuthPage /> },
+  { path: "/register", element: <AuthPage /> },
   { path: "/dashboard", element: <DashboardPage /> },
   { path: "/products", element: <ProductsListPage /> },
   { path: "/products/:id", element: <ProductDetailPage /> },
@@ -37,12 +47,12 @@ export const routes: RouteObject[] = [
   { path: "/sales", element: <PlaceholderPage title="Sales" phase="Phase 5" /> },
   { path: "/forecasts", element: <ForecastsListPage /> },
   { path: "/forecasts/:productId", element: <ForecastDetailPage /> },
-  { path: "/stockout-risks", element: <PlaceholderPage title="Stockout Risks" phase="Phase 12" /> },
+  { path: "/stockout-risks", element: <StockoutRisksPage /> },
   { path: "/dead-stock", element: <DeadStockPage /> },
   { path: "/reorder-recommendations", element: <RecommendationsPage /> },
-  { path: "/anomalies", element: <PlaceholderPage title="Anomalies" phase="Phase 13" /> },
-  { path: "/simulator", element: <PlaceholderPage title="Simulator" phase="Phase 14" /> },
-  { path: "/ai-assistant", element: <PlaceholderPage title="AI Assistant" phase="Phase 16" /> },
-  { path: "/notifications", element: <PlaceholderPage title="Notifications" phase="Phase 15" /> },
-  { path: "/settings", element: <PlaceholderPage title="Settings" phase="Phase 2" /> },
+  { path: "/anomalies", element: <AnomaliesPage /> },
+  { path: "/simulator", element: <SimulatorPage /> },
+  { path: "/ai-assistant", element: <AIAssistantPage /> },
+  { path: "/notifications", element: <NotificationsPage /> },
+  { path: "/settings", element: <SettingsPage /> },
 ];

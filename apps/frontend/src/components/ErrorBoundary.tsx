@@ -1,4 +1,4 @@
-import type {  ErrorInfo, ReactNode } from "react";
+import type { ErrorInfo, ReactNode } from "react";
 import { Component } from "react";
 
 interface ErrorBoundaryProps {
@@ -33,17 +33,31 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div
+          className="min-h-screen flex items-center justify-center px-4"
+          style={{ background: "var(--color-sp-base)" }}
+        >
           <div className="text-center max-w-sm">
-            <p className="text-lg font-semibold text-slate-800">
+            <p
+              className="text-lg font-semibold"
+              style={{ color: "var(--color-sp-text-primary)" }}
+            >
               Something went wrong
             </p>
-            <p className="mt-2 text-sm text-slate-500">
+            <p
+              className="mt-2 text-sm"
+              style={{ color: "var(--color-sp-text-muted)" }}
+            >
               An unexpected error occurred. You can try reloading the page.
             </p>
             <button
               onClick={() => window.location.assign("/dashboard")}
-              className="mt-4 text-sm font-medium px-4 py-2 rounded-md bg-slate-900 text-white hover:bg-slate-800"
+              className="mt-4 text-sm font-medium px-4 py-2 transition-colors duration-150"
+              style={{
+                background: "var(--color-sp-surface)",
+                color: "var(--color-sp-text-primary)",
+                border: "1px solid var(--color-sp-border-default)",
+              }}
             >
               Back to Dashboard
             </button>

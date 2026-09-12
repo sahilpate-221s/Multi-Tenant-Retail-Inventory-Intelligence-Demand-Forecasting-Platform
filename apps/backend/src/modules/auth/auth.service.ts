@@ -112,4 +112,27 @@ export async function refreshSession(refreshTokenPlain: string) {
 export async function revokeRefreshToken(refreshTokenPlain: string) {
   const tokenHash = hashRefreshToken(refreshTokenPlain);
   await db.update(refreshTokens).set({ revoked: true }).where(eq(refreshTokens.tokenHash, tokenHash));
+}
+
+export async function updateUserPassword(userId: string, currentPassword: string, newPassword: string) {
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+  });
+  if (!user) {
+    throw new AuthError("User not found.", "USER_NOT_FOUND");
+  }
+
+  const isValid = await verifyPassword(currentPassword, user.passwordHash);
+  if (!isValid) {
+    throw new AuthError("Current password is incorrect.", "INVALID_CREDENTIALS");
+  }
+
+  const newHash = await hashPassword(newPassword);
+  await db
+    .update(users)
+    .set({
+      passwordHash: newHash,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId));
 }

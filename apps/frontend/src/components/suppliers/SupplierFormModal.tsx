@@ -44,25 +44,71 @@ function SupplierFormModal({ supplier, onClose }: { supplier?: Supplier | null; 
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4">
-      <div className="bg-white rounded-lg w-full max-w-md p-5">
-        <h2 className="font-semibold text-slate-800">{isEditing ? "Edit Supplier" : "New Supplier"}</h2>
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 px-4">
+      <div className="bg-[#141418] border border-[rgba(255,255,255,0.12)] rounded-xl w-full max-w-md p-6 shadow-2xl font-mono text-xs text-[#e8e6e3]">
+        <div className="flex items-center justify-between pb-3 border-b border-[rgba(255,255,255,0.06)]">
+          <h2 className="font-bold text-sm text-[#e8e6e3]">
+            {isEditing ? "Edit Supplier Partner" : "Register Vendor Entity"}
+          </h2>
+          <button onClick={onClose} className="text-[#97979d] hover:text-[#e8e6e3]">✕</button>
+        </div>
+
         <form onSubmit={handleSubmit(onSubmit)} className="mt-4 flex flex-col gap-3">
           <div>
-            <input {...register("name")} placeholder="Supplier name" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm" />
-            {errors.name && <p className="text-xs text-status-danger mt-1">{errors.name.message}</p>}
+            <label className="text-[10px] uppercase text-[#5c5c64] block mb-1">VENDOR ENTITY NAME</label>
+            <input
+              {...register("name")}
+              placeholder="e.g. Arrow Electronics Asia"
+              className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none transition-colors"
+            />
+            {errors.name && <p className="text-[11px] text-[#d45a4a] mt-1">{errors.name.message}</p>}
           </div>
+
           <div>
-            <input {...register("contactEmail")} placeholder="Contact email (optional)" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm" />
-            {errors.contactEmail && <p className="text-xs text-status-danger mt-1">{errors.contactEmail.message}</p>}
+            <label className="text-[10px] uppercase text-[#5c5c64] block mb-1">DISPATCH EMAIL</label>
+            <input
+              {...register("contactEmail")}
+              placeholder="orders@supplier.com"
+              className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none transition-colors"
+            />
+            {errors.contactEmail && <p className="text-[11px] text-[#d45a4a] mt-1">{errors.contactEmail.message}</p>}
           </div>
-          <input {...register("contactPhone")} placeholder="Contact phone (optional)" className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm" />
-          <textarea {...register("reliabilityNotes")} placeholder="Reliability notes (optional)" rows={2} className="w-full border border-slate-300 rounded-md px-3 py-2 text-sm" />
-          {errors.root && <p className="text-sm text-status-danger">{errors.root.message}</p>}
-          <div className="flex justify-end gap-2 mt-2">
-            <button type="button" onClick={onClose} className="text-sm px-3 py-1.5 text-slate-500">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="bg-slate-900 text-white text-sm px-4 py-1.5 rounded-md disabled:opacity-50">
-              {isSubmitting ? "Saving..." : isEditing ? "Save changes" : "Create supplier"}
+
+          <div>
+            <label className="text-[10px] uppercase text-[#5c5c64] block mb-1">PHONE CHANNEL</label>
+            <input
+              {...register("contactPhone")}
+              placeholder="+1 (800) 555-0199"
+              className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none transition-colors"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase text-[#5c5c64] block mb-1">RELIABILITY / SLA NOTES</label>
+            <textarea
+              {...register("reliabilityNotes")}
+              placeholder="Average lead times, warehouse docks, volume discounts..."
+              rows={2}
+              className="w-full bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none transition-colors"
+            />
+          </div>
+
+          {errors.root && <p className="text-xs text-[#d45a4a]">{errors.root.message}</p>}
+
+          <div className="flex justify-end gap-2 mt-4 pt-3 border-t border-[rgba(255,255,255,0.06)]">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-3.5 py-1.5 rounded-lg text-[#97979d] hover:text-[#e8e6e3] hover:bg-[#1a1a22] transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] font-semibold px-4 py-1.5 rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50"
+            >
+              {isSubmitting ? "Saving..." : isEditing ? "Save Vendor" : "Register Supplier"}
             </button>
           </div>
         </form>

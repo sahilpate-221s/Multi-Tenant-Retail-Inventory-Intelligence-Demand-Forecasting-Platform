@@ -4,6 +4,8 @@ import { redisConnection } from "../../queue/redisConnection";
 import { db } from "../../db/client";
 import { imports, importErrors, sales, saleItems } from "../../db/schema";
 import { processCsv } from "./csvProcessor";
+import { createNotification } from "../notifications/notifications.service";
+
 
 interface CsvImportJobData {
   importId: string;
@@ -83,6 +85,13 @@ export const importWorker = new Worker<CsvImportJobData>(
       })
       .where(eq(imports.id, importId));
 
+    await createNotification(
+      storeId,
+      "IMPORT_COMPLETED",
+      "Import completed",
+      `${result.validRows.length} rows imported successfully${allErrorRows.length > 0 ? `, ${allErrorRows.length} rows had errors` : ""}.`,
+    );
+
     return { successCount, errorCount: allErrorRows.length };
   },
   { connection: redisConnection },
@@ -92,5 +101,11 @@ importWorker.on("failed", async (job, err) => {
   console.error(`[import-worker] Job ${job?.id} failed entirely:`, err.message);
   if (job?.data.importId) {
     await db.update(imports).set({ status: "failed" }).where(eq(imports.id, job.data.importId));
+    await createNotification(
+      job.data.storeId,
+      "IMPORT_FAILED",
+      "Import failed",
+      "Your CSV import could not be processed. Please check the file and try again.",
+    );
   }
 });

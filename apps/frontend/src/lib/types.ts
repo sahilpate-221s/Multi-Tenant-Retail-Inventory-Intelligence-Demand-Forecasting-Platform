@@ -175,3 +175,136 @@ export interface ForecastRun {
   modelScoresSnapshot: string;
   generatedAt: string;
 }
+
+export interface StockoutPrediction {
+  id: string;
+  productId: string;
+  productName: string;
+  currentStock: number;
+  incomingStock: number;
+  forecastedDailyDemand: string;
+  demandSource: "forecast" | "historical_average";
+  leadTimeDays: number | null;
+  daysUntilStockout: string | null;
+  riskLevel: "critical" | "high" | "moderate" | "low";
+  calculatedAt: string;
+}
+
+export interface Anomaly {
+  id: string;
+  productId: string;
+  productName: string;
+  anomalyType: string;
+  direction: "spike" | "drop";
+  severity: "moderate" | "significant" | "extreme";
+  observedValue: string;
+  baselineMean: string;
+  zScore: string | null;
+  possibleCauses: string[];
+  detectedAt: string;
+}
+
+export interface SimulationResult {
+  id: string;
+  productId: string;
+  demandChangePercent: string;
+  supplierDelayDays: number;
+  budgetLimit: string | null;
+  baselineCurrentStock: number;
+  baselineAverageDailyDemand: string;
+  baselineLeadTimeDays: number | null;
+  simulatedAverageDailyDemand: string;
+  simulatedLeadTimeDays: number | null;
+  simulatedSafetyStock: number;
+  simulatedReorderPoint: number | null;
+  simulatedRecommendedQuantity: number;
+  simulatedDaysUntilStockout: string | null;
+  estimatedCost: string | null;
+  budgetExceeded: boolean;
+  createdAt: string;
+}
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  relatedProductId: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+  toolsUsed?: string[];
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  timezone: string;
+  currency: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface UpdateStoreInput {
+  name?: string;
+  timezone?: string;
+  currency?: string;
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface InventoryPolicySettings {
+  defaultSafetyStockDays: number;
+  lowStockAlertDays: number;
+  autoReorderEnabled: boolean;
+  blockNegativeInventory: boolean;
+  notifyOnStockout: boolean;
+  notifyOnAnomaly: boolean;
+  notifyOnLeadTimeBreach: boolean;
+  weeklyDigest: boolean;
+  webhookUrl: string;
+}
+
+
+export interface AdvancedAnalytics {
+  recommendationMetrics: {
+    totalResolved: number;
+    ordered: number;
+    dismissed: number;
+    pending: number;
+    acceptanceRate: number | null;
+  };
+  capitalEfficiency: {
+    totalInventoryValue: number;
+    deadStockValue: number;
+    healthyStockValue: number;
+    efficiencyPercent: number | null;
+  };
+  categoryIntelligence: {
+    categoryName: string;
+    productCount: number;
+    totalInventoryValue: number;
+    averageDeadStockScore: number | null;
+  }[];
+  forecastPerformance: {
+    scoreableForecastCount: number;
+    totalForecastCount: number;
+    meanAbsoluteError: number | null;
+    wape: number | null;
+    entries: {
+      forecastId: string;
+      productName: string;
+      horizonDays: number;
+      forecastedTotalDemand: number;
+      actualTotalDemand: number;
+      absoluteError: number;
+    }[];
+  };
+}

@@ -3,11 +3,6 @@ import { apiClient } from "../lib/apiClient";
 import type { Product, Category, ProductListParams } from "../lib/types";
 import { getPaginated } from "../lib/apiClient";
 
-interface RawProductsResponse {
-  success: true;
-  data: Product[];
-  pagination: { page: number; pageSize: number; total: number; totalPages: number };
-}
 
 function buildQueryString(params: ProductListParams): string {
   const query = new URLSearchParams();

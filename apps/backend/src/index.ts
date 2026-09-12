@@ -17,6 +17,12 @@ import intelligenceRoutes from "./modules/intelligence/intelligence.routes";
 import recommendationsRoutes from "./modules/recommendations/recommendations.routes";
 import deadStockRoutes from "./modules/deadStock/deadStock.routes";
 import forecastingRoutes from "./modules/forecasting/forecasting.routes";
+import stockoutRoutes from "./modules/stockout/stockout.routes";
+import anomaliesRoutes from "./modules/anomalies/anomalies.routes";
+import returnsRoutes from "./modules/returns/returns.routes";
+import simulatorRoutes from "./modules/simulator/simulator.routes";
+import notificationsRoutes from "./modules/notifications/notifications.routes"
+import aiRoutes from "./modules/ai/ai.routes";
 
 
 dotenv.config();
@@ -52,6 +58,13 @@ app.use("/api/intelligence", intelligenceRoutes);
 app.use("/api/recommendations", recommendationsRoutes);
 app.use("/api/dead-stock", deadStockRoutes);
 app.use("/api/forecasting", forecastingRoutes);
+app.use("/api/stockout-risks", stockoutRoutes);
+app.use("/api/anomalies", anomaliesRoutes);
+app.use("/api/returns", returnsRoutes);
+app.use("/api/simulations", simulatorRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/ai", aiRoutes);
+
 
 
 app.listen(PORT, () => {

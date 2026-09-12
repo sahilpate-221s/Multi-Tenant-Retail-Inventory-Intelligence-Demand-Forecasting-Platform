@@ -1,10 +1,11 @@
 import { Request, Response } from "express";
-import { registerSchema, loginSchema } from "./auth.schema";
+import { registerSchema, loginSchema, changePasswordSchema } from "./auth.schema";
 import {
   registerStoreAndOwner,
   loginWithCredentials,
   refreshSession,
   revokeRefreshToken,
+  updateUserPassword,
   AuthError,
 } from "./auth.service";
 
@@ -101,4 +102,42 @@ export async function logout(req: Request, res: Response) {
   }
   res.clearCookie("refreshToken", { path: "/api/auth" });
   return res.status(200).json({ success: true, data: { message: "Logged out." } });
+}
+
+export async function changePassword(req: Request, res: Response) {
+  const parsed = changePasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      success: false,
+      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
+    });
+  }
+
+  const userId = req.auth?.userId;
+  if (!userId) {
+    return res.status(401).json({
+      success: false,
+      error: { code: "UNAUTHORIZED", message: "Authentication required." },
+    });
+  }
+
+  try {
+    await updateUserPassword(userId, parsed.data.currentPassword, parsed.data.newPassword);
+    return res.status(200).json({
+      success: true,
+      data: { message: "Password updated successfully." },
+    });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return res.status(400).json({
+        success: false,
+        error: { code: err.code, message: err.message },
+      });
+    }
+    console.error("Change password error:", err);
+    return res.status(500).json({
+      success: false,
+      error: { code: "INTERNAL_ERROR", message: "Failed to update password." },
+    });
+  }
 }

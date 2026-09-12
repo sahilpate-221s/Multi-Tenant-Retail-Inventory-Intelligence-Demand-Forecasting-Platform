@@ -2,6 +2,7 @@ import { eq, and, sql,desc } from "drizzle-orm";
 import { db } from "../../db/client";
 import { sales, saleItems, products } from "../../db/schema";
 import { forecastRuns } from "../../db/schema";
+import { createNotification } from "../notifications/notifications.service";
 
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000";
@@ -109,6 +110,14 @@ export async function generateAndStoreForecast(
       modelScoresSnapshot: JSON.stringify(rawForecast.modelScores),
     })
     .returning();
+
+  await createNotification(
+    storeId,
+    "FORECAST_READY",
+    "New forecast available",
+    `A ${horizonDays}-day demand forecast has been generated (${confidence} confidence).`,
+    productId,
+  );
 
   return run;
 }

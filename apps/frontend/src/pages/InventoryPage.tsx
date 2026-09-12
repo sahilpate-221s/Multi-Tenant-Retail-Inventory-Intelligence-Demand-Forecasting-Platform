@@ -13,45 +13,95 @@ function InventoryPage() {
   const [historyItem, setHistoryItem] = useState<InventoryItem | null>(null);
 
   return (
-    <div className="p-8">
-      <h1 className="text-xl font-semibold text-slate-800">Inventory</h1>
+    <div className="p-6 md:p-8 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-[#d4a853]">
+            SPATIAL TELEMETRY
+          </span>
+          <h1 className="text-xl md:text-2xl font-bold text-[#e8e6e3] mt-0.5">
+            Real-Time Inventory Ledger
+          </h1>
+        </div>
 
-      <div className="mt-4 border border-slate-200 rounded-lg bg-white overflow-hidden">
-        {isLoading && <LoadingState message="Loading inventory..." />}
+        <div className="flex items-center gap-2 text-xs font-mono text-[#97979d]">
+          <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+          <span>LEDGER CONNECTED</span>
+        </div>
+      </div>
+
+      {/* Main Table */}
+      <div className="mt-6 border border-[rgba(255,255,255,0.08)] rounded-xl bg-[#121216]/90 backdrop-blur-xl overflow-hidden shadow-2xl">
+        {isLoading && <LoadingState message="Querying real-time ledger..." />}
         {isError && <ErrorState onRetry={() => refetch()} />}
         {inventory?.length === 0 && (
-          <EmptyState title="No inventory yet" description="Stock levels appear here once products have movements." />
+          <EmptyState
+            title="No inventory records"
+            description="Stock levels will appear here as soon as products register inbound/outbound movements."
+          />
         )}
         {inventory && inventory.length > 0 && (
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-500 text-left">
-              <tr>
-                <th className="px-4 py-2">Product</th>
-                <th className="px-4 py-2">SKU</th>
-                <th className="px-4 py-2">Current Stock</th>
-                <th className="px-4 py-2">Min Stock</th>
-                <th className="px-4 py-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {inventory.map((item) => (
-                <tr key={item.id} className="border-t border-slate-100">
-                  <td className="px-4 py-2">{item.productName}</td>
-                  <td className="px-4 py-2 text-slate-500">{item.sku}</td>
-                  <td className="px-4 py-2">
-                    <span className={item.currentStock <= item.minStock ? "text-status-danger font-medium" : ""}>
-                      {item.currentStock}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2 text-slate-500">{item.minStock}</td>
-                  <td className="px-4 py-2 text-right">
-                    <button onClick={() => setHistoryItem(item)} className="text-xs text-slate-500 hover:underline mr-3">History</button>
-                    <button onClick={() => setAdjustingItem(item)} className="text-xs text-slate-800 hover:underline">Adjust</button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs font-mono">
+              <thead className="bg-[#16161d] text-[#97979d] border-b border-[rgba(255,255,255,0.08)] uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="px-5 py-3">Product Name</th>
+                  <th className="px-5 py-3">SKU Identifier</th>
+                  <th className="px-5 py-3">Current Stock</th>
+                  <th className="px-5 py-3">Safety Min</th>
+                  <th className="px-5 py-3">Buffer Health</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-[rgba(255,255,255,0.04)]">
+                {inventory.map((item) => {
+                  const isLow = item.currentStock <= item.minStock;
+                  return (
+                    <tr key={item.id} className="hover:bg-[#181822]/70 transition-colors group">
+                      <td className="px-5 py-3.5 font-semibold text-[#e8e6e3]">
+                        {item.productName}
+                      </td>
+                      <td className="px-5 py-3.5 text-[#97979d]">{item.sku}</td>
+                      <td className="px-5 py-3.5 font-semibold tabular-nums text-[#e8e6e3]">
+                        <span className={isLow ? "text-[#d45a4a] font-bold" : "text-[#e8e6e3]"}>
+                          {item.currentStock.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-[#97979d] tabular-nums">
+                        {item.minStock.toLocaleString()}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${
+                            isLow
+                              ? "bg-[#d45a4a]/15 text-[#d45a4a] border-[#d45a4a]/30"
+                              : "bg-[#4aba7a]/15 text-[#4aba7a] border-[#4aba7a]/30"
+                          }`}
+                        >
+                          {isLow ? "BELOW SAFETY MIN" : "SUFFICIENT"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          onClick={() => setHistoryItem(item)}
+                          className="text-xs text-[#97979d] hover:text-[#e8e6e3] transition-colors mr-3"
+                        >
+                          History
+                        </button>
+                        <button
+                          onClick={() => setAdjustingItem(item)}
+                          className="px-2.5 py-1 rounded bg-[#1c1c24] hover:bg-[#252530] text-[#d4a853] border border-[rgba(212,168,83,0.3)] transition-all font-semibold"
+                        >
+                          Adjust Stock
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 

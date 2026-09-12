@@ -23,6 +23,8 @@ export function useImports() {
   });
 }
 
+export const useImportList = useImports;
+
 export function useImportDetail(importId: string | null) {
   return useQuery({
     queryKey: ["import", importId],

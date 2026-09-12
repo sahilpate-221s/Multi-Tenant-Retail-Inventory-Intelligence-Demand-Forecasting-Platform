@@ -57,6 +57,41 @@
       "when": 1788611343654,
       "tag": "0007_rare_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788612258005,
+      "tag": "0008_outgoing_namora",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788676679002,
+      "tag": "0009_uneven_sersi",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788700707424,
+      "tag": "0010_bumpy_steel_serpent",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788701665615,
+      "tag": "0011_cultured_mockingbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789041844524,
+      "tag": "0012_bent_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }
