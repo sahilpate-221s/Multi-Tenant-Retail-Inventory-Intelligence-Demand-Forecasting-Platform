@@ -8,6 +8,9 @@ import {
   deleteProduct,
   ProductError,
 } from "./products.service";
+import { logAuditEvent } from "../audit/audit.service";
+
+
 
 export async function getProducts(req: Request, res: Response) {
   const parsed = listProductsQuerySchema.safeParse(req.query);
@@ -39,6 +42,14 @@ export async function postProduct(req: Request, res: Response) {
   }
   try {
     const product = await createProduct(req.auth!.storeId, parsed.data);
+    await logAuditEvent({
+      storeId: req.auth!.storeId,
+      userId: req.auth!.userId,
+      action: "PRODUCT_CREATED",
+      entityType: "product",
+      entityId: product.id,
+      details: { name: product.name, sku: product.sku },
+    });
     return res.status(201).json({ success: true, data: product });
   } catch (err) {
     if (err instanceof ProductError) {
@@ -74,6 +85,14 @@ export async function patchProduct(req: Request, res: Response) {
 
 export async function removeProduct(req: Request, res: Response) {
   const deleted = await deleteProduct(req.auth!.storeId, req.params.id as string);
+  await logAuditEvent({
+    storeId: req.auth!.storeId,
+    userId: req.auth!.userId,
+    action: "PRODUCT_DELETED",
+    entityType: "product",
+    entityId: deleted.id,
+    details: { name: deleted.name },
+  });
   if (!deleted) {
     return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
   }

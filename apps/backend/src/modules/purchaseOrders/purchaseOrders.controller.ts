@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { createPurchaseOrderSchema } from "./purchaseOrders.schema";
 import { createPurchaseOrder, listPurchaseOrders, receivePurchaseOrder, cancelPurchaseOrder, PurchaseOrderError } from "./purchaseOrders.service";
+import { logAuditEvent } from "../audit/audit.service";
 
 export async function postPurchaseOrder(req: Request, res: Response) {
   const parsed = createPurchaseOrderSchema.safeParse(req.body);
@@ -27,6 +28,16 @@ export async function getPurchaseOrders(req: Request, res: Response) {
 export async function postReceive(req: Request, res: Response) {
   try {
     const result = await receivePurchaseOrder(req.auth!.storeId, req.params.id as string);
+
+    await logAuditEvent({
+      storeId: req.auth!.storeId,
+      userId: req.auth!.userId,
+      action: "PURCHASE_ORDER_RECEIVED",
+      entityType: "purchase_order",
+      entityId: req.params.id as string,
+      details: { newStock: result.newStock },
+    });
+
     return res.status(200).json({ success: true, data: result });
   } catch (err) {
     if (err instanceof PurchaseOrderError) {

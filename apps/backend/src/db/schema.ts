@@ -393,3 +393,16 @@ export const conversationMessages = pgTable("conversation_messages", {
   toolsUsed: text("tools_used"), // JSON array, nullable
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+export const auditLogs = pgTable("audit_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").references(() => stores.id, { onDelete: "set null" }), // set null, not cascade - audit history should survive even if a store is later deleted
+  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  action: varchar("action", { length: 100 }).notNull(), // e.g. "LOGIN", "PRODUCT_CREATED", "PRODUCT_DELETED"
+  entityType: varchar("entity_type", { length: 50 }),
+  entityId: uuid("entity_id"),
+  details: text("details"), // JSON, optional extra context
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+

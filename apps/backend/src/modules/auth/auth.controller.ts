@@ -8,6 +8,7 @@ import {
   updateUserPassword,
   AuthError,
 } from "./auth.service";
+import { logAuditEvent } from "../audit/audit.service";
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -55,6 +56,12 @@ export async function login(req: Request, res: Response) {
 
   try {
     const { accessToken, refreshTokenPlain, user } = await loginWithCredentials(parsed.data);
+    await logAuditEvent({
+      storeId: user.storeId,
+      userId: user.id,
+      action: "LOGIN",
+      ipAddress: req.ip,
+    });
     res.cookie("refreshToken", refreshTokenPlain, REFRESH_COOKIE_OPTIONS);
     return res.status(200).json({
       success: true,
@@ -101,6 +108,10 @@ export async function logout(req: Request, res: Response) {
     await revokeRefreshToken(refreshTokenPlain);
   }
   res.clearCookie("refreshToken", { path: "/api/auth" });
+  await logAuditEvent({
+    action: "LOGOUT",
+    ipAddress: req.ip,
+  });
   return res.status(200).json({ success: true, data: { message: "Logged out." } });
 }
 
@@ -140,4 +151,4 @@ export async function changePassword(req: Request, res: Response) {
       error: { code: "INTERNAL_ERROR", message: "Failed to update password." },
     });
   }
-}
+}
