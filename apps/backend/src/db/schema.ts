@@ -6,6 +6,7 @@ import {
   boolean,
   numeric,
   uniqueIndex,
+  index,
   integer,
   date, text,
 } from "drizzle-orm/pg-core";
@@ -181,30 +182,48 @@ export const importErrors = pgTable("import_errors", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
-export const sales = pgTable("sales", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  storeId: uuid("store_id")
-    .notNull()
-    .references(() => stores.id, { onDelete: "cascade" }),
-  importId: uuid("import_id").references(() => imports.id, { onDelete: "set null" }),
-  saleDate: date("sale_date").notNull(),
-  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const sales = pgTable(
+  "sales",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    storeId: uuid("store_id")
+      .notNull()
+      .references(() => stores.id, { onDelete: "cascade" }),
+    importId: uuid("import_id").references(() => imports.id, { onDelete: "set null" }),
+    saleDate: date("sale_date").notNull(),
+    totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    // Justified by real EXPLAIN ANALYZE evidence (Phase 21): every
+    // analytics/forecasting/anomaly query filters by exactly this
+    // combination, and it was hitting a sequential scan.
+    storeIdSaleDateIdx: index("sales_store_id_sale_date_idx").on(table.storeId, table.saleDate),
+  }),
+);
 
-export const saleItems = pgTable("sale_items", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  saleId: uuid("sale_id")
-    .notNull()
-    .references(() => sales.id, { onDelete: "cascade" }),
-  productId: uuid("product_id")
-    .notNull()
-    .references(() => products.id, { onDelete: "restrict" }),
-  quantity: integer("quantity").notNull(),
-  unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
-  lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+export const saleItems = pgTable(
+  "sale_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    saleId: uuid("sale_id")
+      .notNull()
+      .references(() => sales.id, { onDelete: "cascade" }),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict" }),
+    quantity: integer("quantity").notNull(),
+    unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
+    lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (table) => ({
+    // Foreign keys are NOT auto-indexed in Postgres - both of these
+    // are used in a join or filter in nearly every query since Phase 6.
+    productIdIdx: index("sale_items_product_id_idx").on(table.productId),
+    saleIdIdx: index("sale_items_sale_id_idx").on(table.saleId),
+  }),
+);
 
 export const returns = pgTable("returns", {
   id: uuid("id").primaryKey().defaultRandom(),
