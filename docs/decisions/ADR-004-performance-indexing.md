@@ -49,3 +49,30 @@ rather than assuming success or failure without re-measuring.
   every table) — rejected as premature per spec section 71's "does the
   complexity add real value" test; we only indexed columns with actual
   observed `Seq Scan` evidence against real, repeated query patterns.
+
+
+
+
+---
+
+# Addendum: BullMQ Worker Concurrency (Phase 21)
+
+## Investigation
+Checked the CSV import worker's configuration: `new Worker<CsvImportJobData>(...)`
+has no `concurrency` option set, meaning it runs at BullMQ's default of `1` —
+strictly sequential job processing, one import at a time per store.
+
+## Decision
+**Leave it at the default for now.** No evidence exists of import queuing
+ever becoming a real bottleneck — no store has had two large imports
+genuinely waiting on each other. Changing this now would be speculative
+tuning without justification, the same anti-pattern the indexing work
+above was careful to avoid.
+
+## What would justify revisiting this
+A future signal worth watching for: if `imports.status = 'processing'`
+regularly persists for an unusually long time, or multiple `pending`
+import records queue up waiting on the same worker, that's real evidence
+concurrency should be raised — and it would need to be paired with a
+careful review of whether concurrent imports for the same store could
+race on inventory or sales writes, not just bumped blindly.

@@ -109,6 +109,79 @@ export async function adjustStock(storeId: string, input: AdjustStockInput) {
   });
 }
 
+export interface BulkAdjustItem {
+  productId: string;
+  quantity: number;
+}
+
+/**
+ * Bulk stock adjustment — processes all items in a single DB transaction.
+ * Much more efficient than calling adjustStock() N times for large restocks.
+ */
+export async function bulkAdjustStock(storeId: string, items: BulkAdjustItem[], note?: string) {
+  return db.transaction(async (tx) => {
+    const results: { productId: string; productName: string; previousStock: number; newStock: number }[] = [];
+
+    for (const item of items) {
+      // Verify the product belongs to this store
+      const product = await tx.query.products.findFirst({
+        where: and(eq(products.id, item.productId), eq(products.storeId, storeId)),
+      });
+      if (!product) {
+        throw new InventoryError(`Product ${item.productId} not found for this store.`, "PRODUCT_NOT_FOUND");
+      }
+
+      // Get or create inventory row
+      const currentRow = await tx.query.inventory.findFirst({
+        where: and(eq(inventory.storeId, storeId), eq(inventory.productId, item.productId)),
+      });
+
+      const currentStock = currentRow?.currentStock ?? 0;
+      const newStock = currentStock + item.quantity;
+
+      if (newStock < 0) {
+        throw new InventoryError(
+          `Adjustment for "${product.name}" would result in negative stock (${currentStock} → ${newStock}).`,
+          "NEGATIVE_STOCK",
+        );
+      }
+
+      if (currentRow) {
+        await tx
+          .update(inventory)
+          .set({ currentStock: newStock, updatedAt: new Date() })
+          .where(eq(inventory.id, currentRow.id));
+      } else {
+        await tx.insert(inventory).values({
+          storeId,
+          productId: item.productId,
+          currentStock: newStock,
+          minStock: 0,
+          safetyStock: 0,
+        });
+      }
+
+      // Record the movement in the audit ledger
+      await tx.insert(inventoryMovements).values({
+        storeId,
+        productId: item.productId,
+        quantityChange: item.quantity,
+        reason: "restock",
+        note: note || "Bulk CSV restock upload",
+      });
+
+      results.push({
+        productId: item.productId,
+        productName: product.name,
+        previousStock: currentStock,
+        newStock,
+      });
+    }
+
+    return results;
+  });
+}
+
 export async function getMovementHistory(storeId: string, productId: string) {
   return db.query.inventoryMovements.findMany({
     where: and(eq(inventoryMovements.storeId, storeId), eq(inventoryMovements.productId, productId)),

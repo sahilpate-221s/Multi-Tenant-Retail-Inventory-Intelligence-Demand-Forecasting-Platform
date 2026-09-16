@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useInventory } from "../hooks/useInventory";
 import type { InventoryItem } from "../lib/types";
 import LoadingState from "../components/states/LoadingState";
@@ -25,9 +26,17 @@ function InventoryPage() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2 text-xs font-mono text-[#97979d]">
-          <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
-          <span>LEDGER CONNECTED</span>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/inventory/bulk-restock"
+            className="px-3 py-1.5 rounded-lg text-xs font-mono font-semibold bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] transition-all shadow-md active:scale-95"
+          >
+            Bulk Restock Upload
+          </Link>
+          <div className="flex items-center gap-2 text-xs font-mono text-[#97979d]">
+            <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+            <span>LEDGER CONNECTED</span>
+          </div>
         </div>
       </div>
 

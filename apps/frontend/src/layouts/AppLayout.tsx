@@ -23,6 +23,7 @@ const navSections = [
     items: [
       { to: "/sales", label: "Sales" },
       { to: "/import", label: "Import" },
+      { to: "/inventory/bulk-restock", label: "Bulk Restock" },
     ],
   },
   {

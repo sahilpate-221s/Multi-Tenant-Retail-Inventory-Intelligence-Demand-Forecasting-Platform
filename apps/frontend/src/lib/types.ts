@@ -308,3 +308,42 @@ export interface AdvancedAnalytics {
     }[];
   };
 }
+
+// ── Bulk Restock CSV Upload ──
+
+export interface RestockPreviewRow {
+  rowNumber: number;
+  productId: string;
+  productName: string;
+  csvProductName: string;
+  sku: string;
+  matchType: "exact_sku" | "exact_name" | "fuzzy_name";
+  matchConfidence: number;
+  quantity: number;
+  currentStock: number;
+  newStock: number;
+}
+
+export interface RestockPreviewErrorRow {
+  rowNumber: number;
+  rawData: Record<string, string>;
+  errorMessage: string;
+}
+
+export interface RestockPreviewResult {
+  totalRows: number;
+  validRows: RestockPreviewRow[];
+  warnings: RestockPreviewRow[];
+  errors: RestockPreviewErrorRow[];
+}
+
+export interface RestockCommitResult {
+  updatedCount: number;
+  skippedCount: number;
+  results: {
+    productId: string;
+    productName: string;
+    previousStock: number;
+    newStock: number;
+  }[];
+}

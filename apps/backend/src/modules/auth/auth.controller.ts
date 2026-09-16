@@ -9,6 +9,7 @@ import {
   AuthError,
 } from "./auth.service";
 import { logAuditEvent } from "../audit/audit.service";
+import { errorResponse } from "../../lib/apiError";
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -21,10 +22,7 @@ const REFRESH_COOKIE_OPTIONS = {
 export async function register(req: Request, res: Response) {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({
-      success: false,
-      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
-    });
+    return res.status(400).json(errorResponse(req, "VALIDATION_ERROR", parsed.error.issues[0].message));
   }
 
   try {
@@ -35,23 +33,17 @@ export async function register(req: Request, res: Response) {
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      return res.status(409).json({ success: false, error: { code: err.code, message: err.message } });
+      return res.status(409).json(errorResponse(req, err.code, err.message));
     }
     console.error("Registration error:", err);
-    return res.status(500).json({
-      success: false,
-      error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." },
-    });
+    return res.status(500).json(errorResponse(req, "INTERNAL_ERROR", "Something went wrong. Please try again."));
   }
 }
 
 export async function login(req: Request, res: Response) {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({
-      success: false,
-      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
-    });
+    return res.status(400).json(errorResponse(req, "VALIDATION_ERROR", parsed.error.issues[0].message));
   }
 
   try {
@@ -69,13 +61,10 @@ export async function login(req: Request, res: Response) {
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      return res.status(401).json({ success: false, error: { code: err.code, message: err.message } });
+      return res.status(401).json(errorResponse(req, err.code, err.message));
     }
     console.error("Login error:", err);
-    return res.status(500).json({
-      success: false,
-      error: { code: "INTERNAL_ERROR", message: "Something went wrong. Please try again." },
-    });
+    return res.status(500).json(errorResponse(req, "INTERNAL_ERROR", "Something went wrong. Please try again."));
   }
 }
 
@@ -83,7 +72,7 @@ export async function refresh(req: Request, res: Response) {
   const refreshTokenPlain = req.cookies?.refreshToken;
 
   if (!refreshTokenPlain) {
-    return res.status(401).json({ success: false, error: { code: "NO_REFRESH_TOKEN", message: "No session found." } });
+    return res.status(401).json(errorResponse(req, "NO_REFRESH_TOKEN", "No session found."));
   }
 
   try {
@@ -95,10 +84,10 @@ export async function refresh(req: Request, res: Response) {
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      return res.status(401).json({ success: false, error: { code: err.code, message: err.message } });
+      return res.status(401).json(errorResponse(req, err.code, err.message));
     }
     console.error("Refresh error:", err);
-    return res.status(500).json({ success: false, error: { code: "INTERNAL_ERROR", message: "Something went wrong." } });
+    return res.status(500).json(errorResponse(req, "INTERNAL_ERROR", "Something went wrong."));
   }
 }
 
@@ -118,18 +107,12 @@ export async function logout(req: Request, res: Response) {
 export async function changePassword(req: Request, res: Response) {
   const parsed = changePasswordSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({
-      success: false,
-      error: { code: "VALIDATION_ERROR", message: parsed.error.issues[0].message },
-    });
+    return res.status(400).json(errorResponse(req, "VALIDATION_ERROR", parsed.error.issues[0].message));
   }
 
   const userId = req.auth?.userId;
   if (!userId) {
-    return res.status(401).json({
-      success: false,
-      error: { code: "UNAUTHORIZED", message: "Authentication required." },
-    });
+    return res.status(401).json(errorResponse(req, "UNAUTHORIZED", "Authentication required."));
   }
 
   try {
@@ -140,15 +123,9 @@ export async function changePassword(req: Request, res: Response) {
     });
   } catch (err) {
     if (err instanceof AuthError) {
-      return res.status(400).json({
-        success: false,
-        error: { code: err.code, message: err.message },
-      });
+      return res.status(400).json(errorResponse(req, err.code, err.message));
     }
     console.error("Change password error:", err);
-    return res.status(500).json({
-      success: false,
-      error: { code: "INTERNAL_ERROR", message: "Failed to update password." },
-    });
+    return res.status(500).json(errorResponse(req, "INTERNAL_ERROR", "Failed to update password."));
   }
 }

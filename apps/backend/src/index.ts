@@ -1,4 +1,4 @@
-import express from "express";
+import express, { Request } from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
@@ -25,6 +25,13 @@ import notificationsRoutes from "./modules/notifications/notifications.routes";
 import aiRoutes from "./modules/ai/ai.routes";
 import auditRoutes from "./modules/audit/audit.routes";
 import { authRateLimiter, aiRateLimiter, generalRateLimiter } from "./middleware/rateLimiters";
+import pinoHttp from "pino-http";
+import { logger } from "./lib/logger";
+import { requestIdMiddleware } from "./middleware/requestId";
+import { sql } from "drizzle-orm";
+import { db } from "./db/client";
+import { redisConnection } from "./queue/redisConnection";
+
 
 dotenv.config();
 
@@ -52,11 +59,59 @@ app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
-app.get("/health", (_req, res) => {
+app.use(requestIdMiddleware);
+app.use(
+  pinoHttp({
+    logger,
+    genReqId: (req) => (req as Request).requestId,
+    customLogLevel: (_req, res) => (res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info"),
+  }),
+);
+
+// Liveness: nearly instant, checks almost nothing - "is the process alive."
+app.get("/live", (_req, res) => {
+  res.status(200).json({ status: "alive" });
+});
+
+// Readiness: genuinely checks real dependencies - "can this instance
+// actually serve requests right now."
+app.get("/ready", async (_req, res) => {
+  const checks: Record<string, boolean> = {};
+
+  try {
+    await db.execute(sql`SELECT 1`);
+    checks.database = true;
+  } catch {
+    checks.database = false;
+  }
+
+  try {
+    await redisConnection.ping();
+    checks.redis = true;
+  } catch {
+    checks.redis = false;
+  }
+
+  const allReady = Object.values(checks).every(Boolean);
+  res.status(allReady ? 200 : 503).json({ status: allReady ? "ready" : "not_ready", checks });
+});
+
+// General health: human/dashboard-facing, now genuinely reflects
+// dependency status rather than unconditionally returning "ok".
+app.get("/health", async (_req, res) => {
+  let dbStatus = "unknown";
+  try {
+    await db.execute(sql`SELECT 1`);
+    dbStatus = "ok";
+  } catch {
+    dbStatus = "unreachable";
+  }
+
   res.status(200).json({
     status: "ok",
     service: "stockpilot-backend",
     timestamp: new Date().toISOString(),
+    database: dbStatus,
   });
 });
 

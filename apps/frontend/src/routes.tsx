@@ -4,6 +4,7 @@ import ProductsListPage from "./pages/ProductsListPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import SuppliersPage from "./pages/SuppliersPage";
 import InventoryPage from "./pages/InventoryPage";
+import BulkRestockPage from "./pages/BulkRestockPage";
 import ImportPage from "./pages/ImportPage";
 import ImportDetailPage from "./pages/ImportDetailPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -35,6 +36,7 @@ export const routes: RouteObject[] = [
   { path: "/products/:id", element: <ProductDetailPage /> },
 
   { path: "/inventory", element: <InventoryPage /> },
+  { path: "/inventory/bulk-restock", element: <BulkRestockPage /> },
   { path: "/suppliers", element: <SuppliersPage /> },
 
   {
