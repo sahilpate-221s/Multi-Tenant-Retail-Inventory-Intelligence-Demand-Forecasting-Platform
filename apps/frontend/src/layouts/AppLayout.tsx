@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/authContext";
+import { useStoreSettings } from "../hooks/useSettings";
 import NotificationBell from "../components/notifications/NotificationBell";
 import AmbientBackground from "../components/layout/AmbientBackground";
 
@@ -49,7 +50,22 @@ const navSections = [
 
 function AppLayout() {
   const { logout, user } = useAuth();
+  const { data: store } = useStoreSettings();
   const navigate = useNavigate();
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     if (typeof window === "undefined") return DEFAULT_SIDEBAR_WIDTH;
@@ -143,9 +159,42 @@ function AppLayout() {
 
         {/* Wordmark Header */}
         <div
-          className="h-14 shrink-0 flex items-center px-5 gap-1.5"
+          className="h-14 shrink-0 flex items-center px-4 gap-2.5"
           style={{ borderBottom: "1px solid rgba(255, 255, 255, 0.08)" }}
         >
+          {/* Pilot Delta Wing Emblem */}
+          <div
+            className="w-7 h-7 relative shrink-0 flex items-center justify-center rounded-lg"
+            style={{
+              background: "linear-gradient(135deg, rgba(30,28,34,0.9), rgba(14,14,18,0.95))",
+              border: "1px solid rgba(212,168,83,0.35)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.4), 0 0 10px rgba(212,168,83,0.12)",
+            }}
+          >
+            <svg
+              viewBox="0 0 32 32"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-4 h-4"
+            >
+              <defs>
+                <linearGradient id="app-gold-grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fae099" />
+                  <stop offset="60%" stopColor="#d4a853" />
+                  <stop offset="100%" stopColor="#a37629" />
+                </linearGradient>
+                <linearGradient id="app-gold-grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="30%" stopColor="#fae099" />
+                  <stop offset="100%" stopColor="#d4a853" />
+                </linearGradient>
+              </defs>
+              <path d="M16 5L6 23L16 19.5L16 5Z" fill="url(#app-gold-grad1)" opacity="0.88" />
+              <path d="M16 5L26 23L16 19.5L16 5Z" fill="url(#app-gold-grad2)" />
+              <path d="M16 8.5L19.2 19L16 17L12.8 19L16 8.5Z" fill="#ffffff" opacity="0.95" />
+              <circle cx="16" cy="24.5" r="1.5" fill="#f5cf7b" />
+            </svg>
+          </div>
           <span
             className="text-sm font-bold tracking-widest"
             style={{ color: "var(--color-sp-text-primary)" }}
@@ -232,58 +281,133 @@ function AppLayout() {
             borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
           }}
         >
-          {/* Left: Facility & Breadcrumb Indicator */}
+          {/* Left: Store Name Badge */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
-              <span className="text-xs font-mono font-bold tracking-wider text-[#e8e6e3]">
-                MAIN DISTRIBUTION HUB
-              </span>
+            <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 shadow-sm">
+              <div className="w-5 h-5 rounded-md bg-[#d4a853]/15 border border-[#d4a853]/30 flex items-center justify-center text-[#d4a853]">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-[#f4f4f5] tracking-wide">
+                  {store?.name || "Apex Store"}
+                </span>
+                <span className="w-1.5 h-1.5 rounded-full bg-[#4aba7a] shadow-[0_0_8px_rgba(74,186,122,0.6)]" title="Store Connected" />
+              </div>
             </div>
-            <span className="text-[#303035] hidden sm:inline">•</span>
-            <span className="text-[11px] font-mono text-[#97979d] hidden sm:inline">
-              SECTOR 04-A
-            </span>
           </div>
 
-          {/* Right: Command Bar + Notification + Modern Profile Bar */}
-          <div className="flex items-center gap-3 sm:gap-4">
+          {/* Right: Notifications + Settings Dropdown Action Button */}
+          <div className="flex items-center gap-3">
             <NotificationBell />
 
-            {/* Modern User Profile & Logout Strip */}
-            <div className="flex items-center gap-3 pl-3 border-l border-[rgba(255,255,255,0.08)]">
-              {/* User Avatar + Info */}
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#d4a853] to-[#8c6b2d] flex items-center justify-center text-xs font-bold text-[#0c0c0e] shadow-[0_0_12px_rgba(212,168,83,0.3)]">
-                  {userInitial}
-                </div>
-                <div className="hidden md:flex flex-col">
-                  <span className="text-xs font-semibold text-[#e8e6e3] leading-none">
-                    {userDisplayName}
-                  </span>
-                  <span className="text-[10px] font-mono text-[#97979d] mt-1 leading-none truncate max-w-[140px]">
-                    {user?.email}
-                  </span>
-                </div>
-              </div>
-
-              {/* Refined Logout Button */}
+            {/* Settings & Profile Menu */}
+            <div className="relative" ref={settingsMenuRef}>
               <button
-                onClick={async () => {
-                  try {
-                    await logout();
-                  } finally {
-                    navigate("/", { replace: true });
-                  }
-                }}
-                className="px-3 py-1.5 rounded-lg text-xs font-mono font-medium text-[#97979d] hover:text-[#d4a853] bg-[#1a1a22] hover:bg-[#23232d] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(212,168,83,0.3)] transition-all flex items-center gap-1.5 active:scale-95 shadow-sm"
-                title="Log out from StockPilot and return to home"
+                onClick={() => setSettingsOpen((prev) => !prev)}
+                id="nav-settings-dropdown-btn"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-[#97979d] hover:text-[#e8e6e3] bg-[#14141a] hover:bg-[#1c1c24] border border-white/10 hover:border-[#d4a853]/40 transition-all shadow-sm active:scale-95"
+                title="Settings & Session"
               >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                <svg className="w-4 h-4 text-[#d4a853]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="hidden sm:inline">Logout</span>
+                <span className="hidden sm:inline font-medium">Settings</span>
+                <svg
+                  className={`w-3 h-3 text-[#71717a] transition-transform duration-200 ${
+                    settingsOpen ? "rotate-180 text-[#d4a853]" : ""
+                  }`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </button>
+
+              {/* Glassmorphic Dropdown */}
+              {settingsOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-64 rounded-2xl bg-[#121218] border border-white/10 shadow-[0_24px_60px_rgba(0,0,0,0.8)] p-2 z-50 backdrop-blur-2xl"
+                  style={{
+                    boxShadow: "0 20px 50px rgba(0,0,0,0.7), 0 0 25px rgba(212,168,83,0.1)",
+                  }}
+                >
+                  {/* Account Summary Header */}
+                  <div className="px-3 py-2.5 border-b border-white/5 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#d4a853] to-[#8c6b2d] flex items-center justify-center text-xs font-bold text-[#0c0c0e] shrink-0 shadow-sm">
+                      {userInitial}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-[#f4f4f5] truncate">
+                        {store?.name || userDisplayName}
+                      </div>
+                      <div className="text-[10px] text-[#71717a] truncate mt-0.5">
+                        {user?.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions list */}
+                  <div className="py-1.5 space-y-0.5">
+                    <button
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        navigate("/settings");
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left"
+                    >
+                      <svg className="w-4 h-4 text-[#d4a853]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <div className="flex-1">
+                        <div className="font-semibold">Settings Page</div>
+                        <div className="text-[10px] text-[#71717a]">Organization, security & policies</div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        navigate("/settings?tab=inventory");
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left"
+                    >
+                      <svg className="w-4 h-4 text-[#4aba7a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                      <div className="flex-1">
+                        <div className="font-semibold">Inventory Policies</div>
+                        <div className="text-[10px] text-[#71717a]">Buffer days & auto-reorder rules</div>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="my-1 border-t border-white/5" />
+
+                  {/* Logout Button */}
+                  <button
+                    onClick={async () => {
+                      setSettingsOpen(false);
+                      try {
+                        await logout();
+                      } finally {
+                        navigate("/", { replace: true });
+                      }
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#f87171] hover:bg-[#d45a4a]/10 transition-colors text-left group"
+                  >
+                    <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Log Out</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>

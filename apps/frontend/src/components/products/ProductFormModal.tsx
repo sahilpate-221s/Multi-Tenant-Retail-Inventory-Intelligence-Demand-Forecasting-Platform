@@ -65,7 +65,7 @@ function ProductFormModal({ product, onClose }: Props) {
       };
 
       if (isEditing && product) {
-        await updateProduct.mutateAsync({ id: product.id, data: payload });
+        await updateProduct.mutateAsync({ id: product.id, ...payload });
       } else {
         await createProduct.mutateAsync(payload);
       }

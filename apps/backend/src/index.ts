@@ -22,8 +22,10 @@ import anomaliesRoutes from "./modules/anomalies/anomalies.routes";
 import returnsRoutes from "./modules/returns/returns.routes";
 import simulatorRoutes from "./modules/simulator/simulator.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
+import salesRoutes from "./modules/sales/sales.routes";
 import aiRoutes from "./modules/ai/ai.routes";
 import auditRoutes from "./modules/audit/audit.routes";
+import observabilityRoutes from "./modules/observability/observability.routes";
 import { authRateLimiter, aiRateLimiter, generalRateLimiter } from "./middleware/rateLimiters";
 import pinoHttp from "pino-http";
 import { logger } from "./lib/logger";
@@ -124,6 +126,7 @@ app.use("/api/products", productsRoutes);
 app.use("/api/suppliers", suppliersRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/imports", importsRoutes);
+app.use("/api/sales", salesRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/purchase-orders", purchaseOrdersRoutes);
 app.use("/api/intelligence", intelligenceRoutes);
@@ -136,6 +139,7 @@ app.use("/api/returns", returnsRoutes);
 app.use("/api/simulations", simulatorRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/audit-logs", auditRoutes);
+app.use("/api/observability", observabilityRoutes);
 
 app.listen(PORT, () => {
   console.log(`StockPilot backend running on http://localhost:${PORT}`);

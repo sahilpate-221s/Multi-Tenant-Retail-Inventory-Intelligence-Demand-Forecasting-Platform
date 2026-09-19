@@ -16,8 +16,15 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
     return initialMode;
   });
   const [isFlipping, setIsFlipping] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
   const { login, register } = useAuth();
+
+  // Entrance animation
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 60);
+    return () => clearTimeout(t);
+  }, []);
 
   // Listen to browser Back / Forward buttons
   useEffect(() => {
@@ -47,16 +54,13 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
     setIsFlipping(true);
     setMode(target);
     window.history.pushState(null, "", target === "login" ? "/login" : "/register");
-    setTimeout(() => {
-      setIsFlipping(false);
-    }, 1050);
+    setTimeout(() => setIsFlipping(false), 1050);
   };
 
   const handleLoginSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoginError("");
     setLoginLoading(true);
-
     try {
       await login(loginEmail, loginPassword);
       navigate("/dashboard");
@@ -75,7 +79,6 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
     e.preventDefault();
     setRegError("");
     setRegLoading(true);
-
     try {
       await register(regStoreName, regEmail, regPassword);
       navigate("/dashboard");
@@ -94,172 +97,170 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
 
   return (
     <div
-      className="min-h-screen w-full flex flex-col items-center justify-center p-4 relative overflow-hidden select-none"
+      className="min-h-screen w-full flex flex-col items-center justify-center relative overflow-hidden"
       style={{
-        background: "radial-gradient(ellipse 70% 50% at 50% 50%, #161619 0%, #0c0c0e 100%)",
+        background: "radial-gradient(ellipse 80% 60% at 50% 30%, #161619 0%, #0a0a0c 100%)",
       }}
     >
-      {/* Background ambient lighting and grid */}
+      {/* Grid texture */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(212, 168, 83, 0.03) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(212, 168, 83, 0.03) 1px, transparent 1px)
+            linear-gradient(rgba(212, 168, 83, 0.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(212, 168, 83, 0.025) 1px, transparent 1px)
           `,
-          backgroundSize: "48px 48px",
+          backgroundSize: "52px 52px",
         }}
       />
+      {/* Radial glow */}
       <div
-        className="absolute w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none"
+        className="absolute pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(212,168,83,0.08) 0%, transparent 70%)",
-          top: "20%",
+          width: "600px",
+          height: "600px",
+          top: "0%",
           left: "50%",
-          transform: "translate(-50%, -50%)",
+          transform: "translate(-50%, -40%)",
+          background: "radial-gradient(circle, rgba(212,168,83,0.07) 0%, transparent 70%)",
+          filter: "blur(20px)",
         }}
       />
 
-      {/* Top Header Navigation: Back to Landing Page + Brand */}
-      <div className="w-full max-w-[960px] mb-6 z-20 flex items-center justify-between">
+      {/* ── Top bar (borderless, minimalist) ── */}
+      <div
+        className="w-full px-6 md:px-10 absolute top-0 left-0 right-0 h-16 flex items-center justify-between z-20 pointer-events-auto"
+      >
+        {/* Back to Home */}
         <Link
           to="/"
-          id="return-landing-btn-top"
-          className="inline-flex items-center gap-2.5 px-4 py-2 rounded-xl text-xs font-mono font-medium text-[#e8e6e3] hover:text-[#0c0c0e] bg-[rgba(24,24,30,0.8)] hover:bg-[#d4a853] border border-[rgba(255,255,255,0.12)] hover:border-[#d4a853] transition-all duration-200 shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md group"
-          title="Return to StockPilot Landing Page"
+          id="auth-back-home-btn"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#97979d] hover:text-[#e8e6e3] transition-all group"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.07)",
+            backdropFilter: "blur(12px)",
+          }}
+          title="Back to landing page"
         >
           <svg
-            className="w-4 h-4 transition-transform group-hover:-translate-x-1 text-[#d4a853] group-hover:text-[#0c0c0e]"
+            className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          <span className="tracking-wide">Return to Landing Page</span>
-        </Link>
-
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="text-base font-bold tracking-widest text-[#e8e6e3]">STOCK</span>
-          <span className="text-base font-bold tracking-widest text-[#d4a853]">PILOT</span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[rgba(212,168,83,0.12)] text-[#d4a853] border border-[rgba(212,168,83,0.25)]">
-            v2.4
-          </span>
+          <span>Back to home</span>
         </Link>
       </div>
 
-      {/* ─── 3D Perspective Card Container ─── */}
+      {/* ── Card container ── */}
       <div
-        className="w-full max-w-[940px] relative z-10"
+        className="w-full max-w-[900px] mx-auto px-4 py-8"
         style={{
           perspective: "2200px",
-          WebkitPerspective: "2200px",
+          opacity: mounted ? 1 : 0,
+          transform: mounted ? "translateY(0)" : "translateY(20px)",
+          transition: "opacity 0.5s ease, transform 0.5s cubic-bezier(0.16,1,0.3,1)",
         }}
       >
         <div
           className="w-full relative will-change-transform"
           style={{
             transformStyle: "preserve-3d",
-            WebkitTransformStyle: "preserve-3d",
             transition: "transform 1.25s cubic-bezier(0.2, 0.9, 0.25, 1)",
             transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            WebkitTransform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
-            minHeight: "580px",
+            height: "480px",
           }}
         >
-          {/* ═══════════════════════════════════════════ */}
-          {/* FRONT FACE: SIGN IN                       */}
-          {/* ═══════════════════════════════════════════ */}
+
+          {/* ══════════════════════════════════════════
+              FRONT FACE: SIGN IN
+          ══════════════════════════════════════════ */}
           <div
-            className="w-full grid grid-cols-1 md:grid-cols-12 rounded-xl overflow-hidden"
+            className="w-full h-full grid grid-cols-1 md:grid-cols-12 rounded-2xl overflow-hidden absolute inset-0"
             style={{
               backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
-              transform: "rotateY(0deg)",
-              WebkitTransform: "rotateY(0deg)",
-              border: "1px solid var(--color-sp-border-default)",
-              background: "var(--color-sp-elevated)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(16,16,20,0.9)",
               boxShadow: isFlipping
-                ? "0 40px 100px -10px rgba(0,0,0,0.95), 0 0 50px rgba(212,168,83,0.18)"
-                : "0 24px 60px -12px rgba(0,0,0,0.75), 0 0 30px rgba(212,168,83,0.06)",
+                ? "0 40px 100px -10px rgba(0,0,0,0.95), 0 0 60px rgba(212,168,83,0.14)"
+                : "0 24px 60px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)",
+              backdropFilter: "blur(24px)",
               transition: "box-shadow 0.6s ease",
             }}
           >
-            {/* Left Panel: Visual Engine Showcase */}
-            <div className="hidden md:flex md:col-span-5 relative flex-col justify-between p-8 border-r border-[#262629] overflow-hidden">
+            {/* Left visual panel */}
+            <div className="hidden md:flex md:col-span-5 relative flex-col justify-between p-8 overflow-hidden"
+              style={{ borderRight: "1px solid rgba(255,255,255,0.06)" }}
+            >
               <AuthVisualCanvas mode="login" />
 
               <div className="relative z-10">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1a1a1d]/80 border border-[#303035] backdrop-blur-sm">
-                  <span className="w-2 h-2 rounded-full bg-[#4aba7a] animate-pulse" />
-                  <span className="text-[11px] font-mono text-[#e8e6e3] tracking-wide">
-                    AUTHENTICATION ENCLAVE
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#1a1a1d]/80 border border-[#303035] backdrop-blur-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4aba7a] animate-pulse" />
+                  <span className="text-[10px] font-mono text-[#e8e6e3] tracking-widest uppercase">
+                    Secure Access
                   </span>
                 </div>
-                <h2 className="mt-4 text-2xl font-bold tracking-tight text-[#e8e6e3]">
-                  Operator Access
+                <h2 className="mt-4 text-xl font-bold tracking-tight text-[#e8e6e3]">
+                  Welcome back
                 </h2>
                 <p className="mt-2 text-xs text-[#97979d] leading-relaxed">
-                  Real-time stock velocity, neural demand telemetry, and dynamic allocation protocols.
+                  Real-time stock intelligence and demand forecasting awaits.
                 </p>
               </div>
 
-              {/* Live Telemetry Ticker Box */}
-              <div className="relative z-10 p-4 rounded-lg bg-[#0c0c0e]/85 border border-[#303035] backdrop-blur-md">
+              <div className="relative z-10 p-4 rounded-xl bg-[#0c0c0e]/85 border border-[#262629]">
                 <div className="flex justify-between items-center text-[10px] font-mono text-[#5c5c64] uppercase tracking-wider">
-                  <span>SECURITY STATUS</span>
-                  <span className="text-[#4aba7a]">ENCRYPTED TLS</span>
+                  <span>Security</span>
+                  <span className="text-[#4aba7a]">TLS Encrypted</span>
                 </div>
                 <div className="mt-2 flex items-baseline gap-2 font-mono text-[#e8e6e3]">
-                  <span className="text-xl font-bold">99.98%</span>
-                  <span className="text-xs text-[#d4a853]">UPTIME METRIC</span>
-                </div>
-                <div className="mt-2 text-[10px] font-mono text-[#97979d]">
-                  NODE ID: SP-CENTRAL-01 // LATENCY: 22ms
+                  <span className="text-2xl font-bold">99.98%</span>
+                  <span className="text-xs text-[#d4a853]">Uptime</span>
                 </div>
               </div>
             </div>
 
-            {/* Right Panel: Sign In Form */}
-            <div className="md:col-span-7 p-8 md:p-10 flex flex-col justify-between bg-[#141416]">
+            {/* Right: Sign In form */}
+            <div className="md:col-span-7 p-6 md:p-8 flex flex-col justify-center bg-[#0e0e11]">
               <div>
-                <div className="flex items-center justify-between">
-                  <h1 className="text-xl font-semibold text-[#e8e6e3] tracking-tight">
-                    Sign in to your console
-                  </h1>
-                  <span className="text-xs font-mono text-[#5c5c64]">STEP 1/1</span>
-                </div>
-                <p className="mt-1 text-xs text-[#97979d]">
-                  Enter your verified store credentials to continue.
+                <h1 className="text-xl font-semibold text-[#e8e6e3] tracking-tight mb-1">
+                  Sign in to your account
+                </h1>
+                <p className="text-xs text-[#5c5c64] mb-5">
+                  Enter your credentials to access the dashboard.
                 </p>
 
                 {loginError && (
-                  <div className="mt-4 p-3 rounded bg-[rgba(212,90,74,0.1)] border border-[rgba(212,90,74,0.3)] text-xs text-[#d45a4a]">
+                  <div className="mb-5 p-3 rounded-lg bg-[rgba(212,90,74,0.08)] border border-[rgba(212,90,74,0.25)] text-xs text-[#d45a4a]">
                     {loginError}
                   </div>
                 )}
 
-                <form onSubmit={handleLoginSubmit} className="mt-6 space-y-4">
+                <form onSubmit={handleLoginSubmit} className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
-                      Work Email
+                    <label className="block text-[10px] font-mono uppercase text-[#5c5c64] mb-2 tracking-widest">
+                      Email
                     </label>
                     <input
                       type="email"
                       required
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="operator@stockpilot.io"
-                      className="w-full px-3.5 py-2.5 rounded text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[#303035] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors"
+                      placeholder="you@company.com"
+                      className="w-full px-3.5 py-2.5 rounded-lg text-sm bg-[#0a0a0c] text-[#e8e6e3] border border-[#262629] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[rgba(212,168,83,0.2)] transition-all"
                     />
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="block text-[11px] font-mono uppercase text-[#97979d] tracking-wider">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-[10px] font-mono uppercase text-[#5c5c64] tracking-widest">
                         Password
                       </label>
-                      <span className="text-[11px] text-[#5c5c64] hover:text-[#d4a853] cursor-pointer transition-colors">
+                      <span className="text-[10px] text-[#5c5c64] hover:text-[#d4a853] cursor-pointer transition-colors">
                         Forgot?
                       </span>
                     </div>
@@ -269,132 +270,126 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-3.5 py-2.5 rounded text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[#303035] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-lg text-sm bg-[#0a0a0c] text-[#e8e6e3] border border-[#262629] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[rgba(212,168,83,0.2)] transition-all font-mono"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={loginLoading}
-                    className="w-full mt-2 py-2.5 px-4 rounded text-sm font-semibold tracking-wide text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full mt-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-[#0c0c0e] transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    style={{
+                      background: "linear-gradient(135deg, #d4a853 0%, #e8be66 100%)",
+                      boxShadow: "0 0 20px rgba(212,168,83,0.2)",
+                    }}
                   >
                     {loginLoading ? (
                       <>
                         <span className="w-4 h-4 border-2 border-[#0c0c0e] border-t-transparent rounded-full animate-spin" />
-                        Authenticating...
+                        Signing in...
                       </>
                     ) : (
-                      "Access Inventory Mesh →"
+                      "Sign in →"
                     )}
                   </button>
                 </form>
               </div>
 
-              {/* Flip to Register Toggle & Return to Landing */}
-              <div className="mt-8 pt-6 border-t border-[#262629] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <Link
-                  to="/"
-                  className="text-[#97979d] hover:text-[#d4a853] flex items-center gap-1.5 transition-colors font-mono"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  <span>Return to Landing</span>
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => flipTo("register")}
-                  className="font-semibold text-[#d4a853] hover:text-[#e8be66] hover:underline flex items-center gap-1 transition-colors"
-                >
-                  Create Account (Flip) ↺
-                </button>
+              {/* Footer row */}
+              <div className="mt-5 pt-4 border-t border-[#1e1e22] flex items-center justify-between text-xs">
+                <span className="text-[#5c5c64]">
+                  Don't have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => flipTo("register")}
+                    className="text-[#d4a853] hover:text-[#e8be66] font-semibold transition-colors"
+                  >
+                    Create one
+                  </button>
+                </span>
               </div>
             </div>
           </div>
 
-          {/* ═══════════════════════════════════════════ */}
-          {/* BACK FACE: REGISTER                       */}
-          {/* ═══════════════════════════════════════════ */}
+          {/* ══════════════════════════════════════════
+              BACK FACE: REGISTER
+          ══════════════════════════════════════════ */}
           <div
-            className="w-full grid grid-cols-1 md:grid-cols-12 rounded-xl overflow-hidden absolute inset-0"
+            className="w-full h-full grid grid-cols-1 md:grid-cols-12 rounded-2xl overflow-hidden absolute inset-0"
             style={{
               backfaceVisibility: "hidden",
-              WebkitBackfaceVisibility: "hidden",
               transform: "rotateY(180deg)",
-              WebkitTransform: "rotateY(180deg)",
-              border: "1px solid var(--color-sp-border-default)",
-              background: "var(--color-sp-elevated)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              background: "rgba(16,16,20,0.9)",
               boxShadow: isFlipping
-                ? "0 40px 100px -10px rgba(0,0,0,0.95), 0 0 50px rgba(212,168,83,0.18)"
-                : "0 24px 60px -12px rgba(0,0,0,0.75), 0 0 30px rgba(212,168,83,0.06)",
+                ? "0 40px 100px -10px rgba(0,0,0,0.95), 0 0 60px rgba(212,168,83,0.14)"
+                : "0 24px 60px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.04)",
+              backdropFilter: "blur(24px)",
               transition: "box-shadow 0.6s ease",
             }}
           >
-            {/* Left Panel: Visual Engine Showcase (Registration) */}
-            <div className="hidden md:flex md:col-span-5 relative flex-col justify-between p-8 border-r border-[#262629] overflow-hidden">
+            {/* Left visual panel */}
+            <div className="hidden md:flex md:col-span-5 relative flex-col justify-between p-8 overflow-hidden"
+              style={{ borderRight: "1px solid rgba(255,255,255,0.06)" }}
+            >
               <AuthVisualCanvas mode="register" />
 
               <div className="relative z-10">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded bg-[#1a1a1d]/80 border border-[#303035] backdrop-blur-sm">
-                  <span className="w-2 h-2 rounded-full bg-[#d4a853] animate-pulse" />
-                  <span className="text-[11px] font-mono text-[#d4a853] tracking-wide">
-                    PROVISION INSTANCE
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-[#1a1a1d]/80 border border-[#303035] backdrop-blur-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853] animate-pulse" />
+                  <span className="text-[10px] font-mono text-[#d4a853] tracking-widest uppercase">
+                    New Account
                   </span>
                 </div>
-                <h2 className="mt-4 text-2xl font-bold tracking-tight text-[#e8e6e3]">
-                  Initialize Tenant
+                <h2 className="mt-4 text-xl font-bold tracking-tight text-[#e8e6e3]">
+                  Set up your store
                 </h2>
                 <p className="mt-2 text-xs text-[#97979d] leading-relaxed">
-                  Establish an isolated cryptographic tenant workspace with AI forecasting, anomaly triggers, and real-time inventory ledger.
+                  Get AI-powered inventory intelligence up and running in minutes.
                 </p>
               </div>
 
-              {/* Tenant Provisioning Spec Box */}
-              <div className="relative z-10 p-4 rounded-lg bg-[#0c0c0e]/85 border border-[#303035] backdrop-blur-md">
-                <div className="text-[10px] font-mono text-[#5c5c64] uppercase tracking-wider mb-1">
-                  PROVISIONING PARAMETERS
+              <div className="relative z-10 p-4 rounded-xl bg-[#0c0c0e]/85 border border-[#262629]">
+                <div className="text-[10px] font-mono text-[#5c5c64] uppercase tracking-wider mb-2">
+                  What you get
                 </div>
-                <div className="space-y-1 text-[11px] font-mono text-[#97979d]">
-                  <div className="flex justify-between">
-                    <span>MULTI-TENANT ISOLATION</span>
-                    <span className="text-[#4aba7a]">ACTIVE</span>
+                <div className="space-y-1.5 text-[11px] font-mono text-[#97979d]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#4aba7a]" />
+                    <span>Demand forecasting</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>3D SPATIAL TWIN</span>
-                    <span className="text-[#d4a853]">ENABLED</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#d4a853]" />
+                    <span>Anomaly detection</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>DEMAND FORECASTING</span>
-                    <span className="text-[#e8e6e3]">REAL-TIME</span>
+                  <div className="flex items-center gap-2">
+                    <span className="w-1 h-1 rounded-full bg-[#6b8cc7]" />
+                    <span>AI assistant</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right Panel: Register Form */}
-            <div className="md:col-span-7 p-8 md:p-10 flex flex-col justify-between bg-[#141416]">
+            {/* Right: Register form */}
+            <div className="md:col-span-7 p-6 md:p-8 flex flex-col justify-center bg-[#0e0e11]">
               <div>
-                <div className="flex items-center justify-between">
-                  <h1 className="text-xl font-semibold text-[#e8e6e3] tracking-tight">
-                    Create your organization
-                  </h1>
-                  <span className="text-xs font-mono text-[#d4a853]">TENANT INIT</span>
-                </div>
-                <p className="mt-1 text-xs text-[#97979d]">
-                  Deploy your intelligent inventory node in under 30 seconds.
+                <h1 className="text-xl font-semibold text-[#e8e6e3] tracking-tight mb-1">
+                  Create your account
+                </h1>
+                <p className="text-xs text-[#5c5c64] mb-5">
+                  Takes less than two minutes to get started.
                 </p>
 
                 {regError && (
-                  <div className="mt-4 p-3 rounded bg-[rgba(212,90,74,0.1)] border border-[rgba(212,90,74,0.3)] text-xs text-[#d45a4a]">
+                  <div className="mb-5 p-3 rounded-lg bg-[rgba(212,90,74,0.08)] border border-[rgba(212,90,74,0.25)] text-xs text-[#d45a4a]">
                     {regError}
                   </div>
                 )}
 
-                <form onSubmit={handleRegisterSubmit} className="mt-5 space-y-3.5">
+                <form onSubmit={handleRegisterSubmit} className="space-y-3">
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
-                      Store / Organization Name
+                    <label className="block text-[10px] font-mono uppercase text-[#5c5c64] mb-2 tracking-widest">
+                      Store / Organization name
                     </label>
                     <input
                       type="text"
@@ -402,27 +397,27 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
                       value={regStoreName}
                       onChange={(e) => setRegStoreName(e.target.value)}
                       placeholder="e.g. Apex Central Logistics"
-                      className="w-full px-3.5 py-2.5 rounded text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[#303035] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors"
+                      className="w-full px-3.5 py-2.5 rounded-lg text-sm bg-[#0a0a0c] text-[#e8e6e3] border border-[#262629] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[rgba(212,168,83,0.2)] transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
-                      Work Email
+                    <label className="block text-[10px] font-mono uppercase text-[#5c5c64] mb-2 tracking-widest">
+                      Email
                     </label>
                     <input
                       type="email"
                       required
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="director@apexlogistics.com"
-                      className="w-full px-3.5 py-2.5 rounded text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[#303035] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors"
+                      placeholder="you@company.com"
+                      className="w-full px-3.5 py-2.5 rounded-lg text-sm bg-[#0a0a0c] text-[#e8e6e3] border border-[#262629] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[rgba(212,168,83,0.2)] transition-all"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
-                      Master Password
+                    <label className="block text-[10px] font-mono uppercase text-[#5c5c64] mb-2 tracking-widest">
+                      Password
                     </label>
                     <input
                       type="password"
@@ -431,46 +426,43 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
                       placeholder="Minimum 8 characters"
-                      className="w-full px-3.5 py-2.5 rounded text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[#303035] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-lg text-sm bg-[#0a0a0c] text-[#e8e6e3] border border-[#262629] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[rgba(212,168,83,0.2)] transition-all font-mono"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={regLoading}
-                    className="w-full mt-2 py-2.5 px-4 rounded text-sm font-semibold tracking-wide text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    className="w-full mt-2 py-2.5 px-4 rounded-lg text-sm font-semibold text-[#0c0c0e] transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    style={{
+                      background: "linear-gradient(135deg, #d4a853 0%, #e8be66 100%)",
+                      boxShadow: "0 0 20px rgba(212,168,83,0.2)",
+                    }}
                   >
                     {regLoading ? (
                       <>
                         <span className="w-4 h-4 border-2 border-[#0c0c0e] border-t-transparent rounded-full animate-spin" />
-                        Provisioning Node...
+                        Creating account...
                       </>
                     ) : (
-                      "Initialize Store Instance →"
+                      "Create account →"
                     )}
                   </button>
                 </form>
               </div>
 
-              {/* Flip back to Login Toggle & Return to Landing */}
-              <div className="mt-6 pt-5 border-t border-[#262629] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                <Link
-                  to="/"
-                  className="text-[#97979d] hover:text-[#d4a853] flex items-center gap-1.5 transition-colors font-mono"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  <span>Return to Landing</span>
-                </Link>
-
-                <button
-                  type="button"
-                  onClick={() => flipTo("login")}
-                  className="font-semibold text-[#d4a853] hover:text-[#e8be66] hover:underline flex items-center gap-1 transition-colors"
-                >
-                  Sign in to console (Flip) ↺
-                </button>
+              {/* Footer row */}
+              <div className="mt-5 pt-4 border-t border-[#1e1e22] flex items-center justify-between text-xs">
+                <span className="text-[#5c5c64]">
+                  Already have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={() => flipTo("login")}
+                    className="text-[#d4a853] hover:text-[#e8be66] font-semibold transition-colors"
+                  >
+                    Sign in
+                  </button>
+                </span>
               </div>
             </div>
           </div>

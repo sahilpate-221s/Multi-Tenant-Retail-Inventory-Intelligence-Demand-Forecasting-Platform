@@ -75,9 +75,9 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
               <dd className="font-semibold text-[#e8e6e3] mt-0.5">{rec.leadTimeDays ?? "—"} days</dd>
             </div>
           </dl>
-          {rec.reasonCode && (
+          {rec.reasonCodes && rec.reasonCodes.length > 0 && (
             <p className="mt-2.5 text-xs font-mono text-[#97979d]">
-              Decision logic: <span className="text-[#e8be66]">{formatReasonCode(rec.reasonCode)}</span>
+              Decision logic: <span className="text-[#e8be66]">{rec.reasonCodes.map(formatReasonCode).join(", ")}</span>
             </p>
           )}
           <ExplainButton type="reorder-recommendation" id={rec.id} />

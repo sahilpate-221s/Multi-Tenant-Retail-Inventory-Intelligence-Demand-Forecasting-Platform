@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { usePreviewCsv, useCommitCsv, useImportList } from "../hooks/useImports";
-import type { CsvPreviewResult } from "../lib/types";
+import type { PreviewResult, PreviewRow } from "../lib/types";
 import { ApiError } from "../lib/apiClient";
 import LoadingState from "../components/states/LoadingState";
 import EmptyState from "../components/states/EmptyState";
@@ -9,7 +9,7 @@ import EmptyState from "../components/states/EmptyState";
 function ImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<CsvPreviewResult | null>(null);
+  const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [committedImportId, setCommittedImportId] = useState<string | null>(null);
 
@@ -42,11 +42,11 @@ function ImportPage() {
     try {
       const result = await commitCsv.mutateAsync(file);
       setCommittedImportId(result.importId);
-      setPreview(null);
       setFile(null);
+      setPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      setError(err instanceof ApiError ? err.message : "Failed to import CSV.");
     }
   }
 
@@ -120,7 +120,7 @@ function ImportPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[rgba(255,255,255,0.04)]">
-                      {preview.validRows.slice(0, 5).map((r) => (
+                      {preview.validRows.slice(0, 5).map((r: PreviewRow) => (
                         <tr key={r.rowNumber} className="hover:bg-[#181822]/60 text-[#e8e6e3]">
                           <td className="px-3 py-2 text-[#5c5c64]">{r.rowNumber}</td>
                           <td className="px-3 py-2 text-[#97979d]">{r.saleDate}</td>

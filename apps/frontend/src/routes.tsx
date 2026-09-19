@@ -26,6 +26,7 @@ import AIAssistantPage from "./pages/AIAssistantPage";
 import LandingPage from "./pages/LandingPage";
 import AuthPage from "./pages/AuthPage";
 import SettingsPage from "./pages/SettingsPage";
+import SalesPage from "./pages/SalesPage";
 
 export const routes: RouteObject[] = [
   { path: "/", element: <LandingPage /> },
@@ -46,7 +47,7 @@ export const routes: RouteObject[] = [
   { path: "/import", element: <ImportPage /> },
   { path: "/import/:id", element: <ImportDetailPage /> },
 
-  { path: "/sales", element: <PlaceholderPage title="Sales" phase="Phase 5" /> },
+  { path: "/sales", element: <SalesPage /> },
   { path: "/forecasts", element: <ForecastsListPage /> },
   { path: "/forecasts/:productId", element: <ForecastDetailPage /> },
   { path: "/stockout-risks", element: <StockoutRisksPage /> },

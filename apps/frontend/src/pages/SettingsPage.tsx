@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type FormEvent } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/authContext";
 import { useStoreSettings, useUpdateStoreSettings, useChangePassword } from "../hooks/useSettings";
 import { ApiError } from "../lib/apiClient";
@@ -27,12 +28,28 @@ const CURRENCIES = [
 ];
 
 export default function SettingsPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: store, isLoading: storeLoading } = useStoreSettings();
   const updateStoreMutation = useUpdateStoreSettings();
   const changePasswordMutation = useChangePassword();
 
-  const [activeTab, setActiveTab] = useState<TabId>("general");
+  // Active tab state (synced with ?tab= query parameter)
+  const initialTab = (searchParams.get("tab") as TabId) || "general";
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab") as TabId;
+    if (tabParam && ["general", "security", "inventory", "notifications", "integrations", "data"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
+
+  const switchTab = (tab: TabId) => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
 
   // ─── General Settings Form State ───
   const [storeName, setStoreName] = useState("");
@@ -99,7 +116,7 @@ export default function SettingsPage() {
   const [pingStatus, setPingStatus] = useState<"idle" | "pinging" | "success" | "error">("idle");
 
   // ─── Handlers ───
-  const handleSaveGeneral = async (e: React.FormEvent) => {
+  const handleSaveGeneral = async (e: FormEvent) => {
     e.preventDefault();
     setGeneralError(null);
     setGeneralSuccess(false);
@@ -116,12 +133,12 @@ export default function SettingsPage() {
       if (err instanceof ApiError) {
         setGeneralError(err.message);
       } else {
-        setGeneralError("Failed to update store details.");
+        setGeneralError("Failed to update store details. Please try again.");
       }
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault();
     setPasswordError(null);
     setPasswordSuccess(false);
@@ -132,7 +149,7 @@ export default function SettingsPage() {
     }
 
     if (newPassword !== confirmPassword) {
-      setPasswordError("New password confirmation does not match.");
+      setPasswordError("New password and confirmation do not match.");
       return;
     }
 
@@ -150,12 +167,12 @@ export default function SettingsPage() {
       if (err instanceof ApiError) {
         setPasswordError(err.message);
       } else {
-        setPasswordError("Failed to update password. Verify current password.");
+        setPasswordError("Failed to update password. Verify your current password.");
       }
     }
   };
 
-  const handleSaveInventory = (e: React.FormEvent) => {
+  const handleSaveInventory = (e: FormEvent) => {
     e.preventDefault();
     localStorage.setItem("sp_setting_safety_days", String(safetyBufferDays));
     localStorage.setItem("sp_setting_low_days", String(lowStockDays));
@@ -165,7 +182,7 @@ export default function SettingsPage() {
     setTimeout(() => setInventorySuccess(false), 3000);
   };
 
-  const handleSaveNotifications = (e: React.FormEvent) => {
+  const handleSaveNotifications = (e: FormEvent) => {
     e.preventDefault();
     localStorage.setItem("sp_notify_stockout", String(notifyStockout));
     localStorage.setItem("sp_notify_anomaly", String(notifyAnomaly));
@@ -199,7 +216,8 @@ export default function SettingsPage() {
   };
 
   const handleExportCSV = () => {
-    const csvContent = "data:text/csv;charset=utf-8,SKU,Name,Category,CurrentStock,SafetyStock,UnitCost,UnitSellingPrice\nSKU-3829-MC,ARM Cortex-M4 120MHz,Semiconductors,1420,480,185.00,290.00\nSKU-MOS-60V,Dual N-Channel MOSFET 60V,Power Electronics,890,320,42.50,78.00\nSKU-9102-OPT,Differential Optical Encoder,Sensors,410,150,540.00,850.00";
+    const csvContent =
+      "data:text/csv;charset=utf-8,SKU,Name,Category,CurrentStock,SafetyStock,UnitCost,UnitSellingPrice\nSKU-3829-MC,ARM Cortex-M4 120MHz,Semiconductors,1420,480,185.00,290.00\nSKU-MOS-60V,Dual N-Channel MOSFET 60V,Power Electronics,890,320,42.50,78.00\nSKU-9102-OPT,Differential Optical Encoder,Sensors,410,150,540.00,850.00";
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -210,131 +228,213 @@ export default function SettingsPage() {
   };
 
   if (storeLoading) {
-    return <LoadingState message="Loading organization settings..." />;
+    return <LoadingState message="Loading store settings..." />;
   }
-
-  const tabs: { id: TabId; label: string; icon: string }[] = [
-    { id: "general", label: "Organization", icon: "🏢" },
-    { id: "security", label: "Security & Access", icon: "🛡️" },
-    { id: "inventory", label: "Warehouse Policies", icon: "📦" },
-    { id: "notifications", label: "Alerts & Telemetry", icon: "🔔" },
-    { id: "integrations", label: "API & Webhooks", icon: "⚡" },
-    { id: "data", label: "Data & Danger Zone", icon: "💾" },
-  ];
 
   const simulatedApiKey = `sp_live_${store?.id ? store.id.replace(/-/g, "").slice(0, 16) : "8fa73b9e4a1c0d2f"}_k9x`;
 
+  const tabs: {
+    id: TabId;
+    label: string;
+    description: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: "general",
+      label: "Store Profile",
+      description: "Name, currency & timezone",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+    },
+    {
+      id: "security",
+      label: "Security & Access",
+      description: "Password & active session",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
+    },
+    {
+      id: "inventory",
+      label: "Inventory Policies",
+      description: "Safety buffer & reorder rules",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+      ),
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      description: "Stockouts & anomaly alerts",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      ),
+    },
+    {
+      id: "integrations",
+      label: "API & Webhooks",
+      description: "Store keys & event endpoints",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+        </svg>
+      ),
+    },
+    {
+      id: "data",
+      label: "Data Management",
+      description: "CSV exports & workspace cleanup",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M4 7h16" />
+        </svg>
+      ),
+    },
+  ];
+
   return (
-    <div className="p-6 md:p-8 max-w-6xl mx-auto select-none">
+    <div className="p-6 md:p-10 max-w-6xl mx-auto">
       {/* ─── Page Title Header ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[rgba(255,255,255,0.08)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-8 border-b border-white/8">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1.5">
             <span className="w-2 h-2 rounded-full bg-[#d4a853]" />
-            <span className="text-[11px] font-mono uppercase tracking-widest text-[#97979d]">
-              TENANT CONTROL PLANE
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#d4a853]">
+              Store Configuration
             </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#e8e6e3] tracking-tight mt-1">
-            System Settings
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#f4f4f5] tracking-tight">
+            Settings & Preferences
           </h1>
-          <p className="text-xs text-[#97979d] mt-1 font-mono">
-            Manage your facility parameters, cryptographic credentials, and autonomous restock policies.
+          <p className="text-xs text-[#97979d] mt-1">
+            Manage your store details, automated restock thresholds, notification alerts, and API credentials.
           </p>
         </div>
 
-        {/* Status indicator badge */}
-        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-[#14141a] border border-[rgba(255,255,255,0.08)]">
-          <span className="w-2 h-2 rounded-full bg-[#4aba7a] animate-pulse" />
-          <span className="text-xs font-mono font-medium text-[#e8e6e3]">
-            Tenant Mesh: <span className="text-[#4aba7a]">Operational</span>
-          </span>
+        {/* Current Store Status Badge */}
+        <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-white/[0.03] border border-white/8 shadow-sm">
+          <span className="w-2 h-2 rounded-full bg-[#4aba7a] shadow-[0_0_8px_rgba(74,186,122,0.8)]" />
+          <div className="flex flex-col">
+            <span className="text-xs font-bold text-[#f4f4f5] leading-none">
+              {store?.name || "Apex Store"}
+            </span>
+            <span className="text-[10px] text-[#71717a] mt-0.5">
+              Live & Synced
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* ─── Main Content Grid: Tabs + Body ─── */}
+      {/* ─── Main Content Grid: Tabs Column + Content Panel ─── */}
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Nav Tabs */}
-        <div className="lg:col-span-3 space-y-1.5">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-mono transition-all text-left ${
-                activeTab === tab.id
-                  ? "bg-[#d4a853] text-[#0c0c0e] font-bold shadow-[0_4px_15px_rgba(212,168,83,0.25)]"
-                  : "bg-[#14141a] text-[#97979d] hover:text-[#e8e6e3] hover:bg-[#1a1a22] border border-[rgba(255,255,255,0.04)]"
-              }`}
-            >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-            </button>
-          ))}
-
-          {/* Quick Node Identity Pill */}
-          <div className="p-4 rounded-xl bg-[#101014] border border-[rgba(255,255,255,0.06)] mt-6 text-[11px] font-mono text-[#97979d]">
-            <span className="text-[10px] text-[#5c5c64] uppercase block">FACILITY NODE</span>
-            <span className="text-[#e8e6e3] font-semibold mt-0.5 block truncate">
-              {store?.name || "Apex Central"}
-            </span>
-            <span className="text-[#d4a853] text-[10px] block mt-1">v2.4.1 (Distributed)</span>
-          </div>
+        <div className="lg:col-span-4 space-y-2">
+          {tabs.map((tab) => {
+            const isCurrent = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => switchTab(tab.id)}
+                className={`w-full flex items-center gap-3.5 p-3.5 rounded-2xl text-left transition-all group ${
+                  isCurrent
+                    ? "bg-[#d4a853]/15 text-[#f5cf7b] border border-[#d4a853]/40 shadow-[0_4px_20px_rgba(212,168,83,0.15)]"
+                    : "bg-[#121218]/60 text-[#97979d] hover:text-[#f4f4f5] hover:bg-[#181822] border border-white/5"
+                }`}
+              >
+                <div
+                  className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                    isCurrent
+                      ? "bg-[#d4a853] text-[#0c0c0e]"
+                      : "bg-white/[0.04] text-[#97979d] group-hover:text-[#d4a853]"
+                  }`}
+                >
+                  {tab.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className={`text-xs font-semibold ${isCurrent ? "text-[#f5cf7b]" : "text-[#e8e6e3]"}`}>
+                    {tab.label}
+                  </div>
+                  <div className="text-[11px] text-[#71717a] truncate mt-0.5">
+                    {tab.description}
+                  </div>
+                </div>
+                {isCurrent && (
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Right Settings Panel */}
-        <div className="lg:col-span-9">
+        <div className="lg:col-span-8">
           {/* ═══════════════════════════════════════════ */}
-          {/* TAB 1: ORGANIZATION / GENERAL PROFILE       */}
+          {/* TAB 1: STORE & ORGANIZATION PROFILE         */}
           {/* ═══════════════════════════════════════════ */}
           {activeTab === "general" && (
-            <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-              <h2 className="text-lg font-bold text-[#e8e6e3] tracking-tight">
-                Organization & Facility Profile
-              </h2>
-              <p className="text-xs text-[#97979d] mt-1">
-                Configure primary tenant identity, operational timezone for daily run-rates, and base accounting currency.
+            <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                <h2 className="text-base font-bold text-[#f4f4f5]">
+                  Store & Organization Profile
+                </h2>
+              </div>
+              <p className="text-xs text-[#97979d]">
+                Set your primary store identity, operational timezone, and currency for calculations.
               </p>
 
               {generalSuccess && (
-                <div className="mt-4 p-3 rounded-xl bg-[rgba(74,186,122,0.12)] border border-[rgba(74,186,122,0.3)] text-xs font-mono text-[#4aba7a] flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#4aba7a]" />
-                  Organization details updated successfully.
+                <div className="mt-4 p-3.5 rounded-xl bg-[#4aba7a]/15 border border-[#4aba7a]/30 text-xs text-[#4aba7a] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+                  <span>Store details updated successfully.</span>
                 </div>
               )}
 
               {generalError && (
-                <div className="mt-4 p-3 rounded-xl bg-[rgba(212,90,74,0.12)] border border-[rgba(212,90,74,0.3)] text-xs font-mono text-[#d45a4a]">
+                <div className="mt-4 p-3.5 rounded-xl bg-[#d45a4a]/15 border border-[#d45a4a]/30 text-xs text-[#f87171]">
                   {generalError}
                 </div>
               )}
 
               <form onSubmit={handleSaveGeneral} className="mt-6 space-y-5">
                 <div>
-                  <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
-                    Store / Facility Name
+                  <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
+                    Store Name
                   </label>
                   <input
                     type="text"
                     required
                     value={storeName}
                     onChange={(e) => setStoreName(e.target.value)}
-                    placeholder="e.g. Apex Central Distribution Hub"
-                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors"
+                    placeholder="e.g. Apex Goods & Apparel"
+                    className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors"
                   />
+                  <span className="text-[11px] text-[#71717a] mt-1 block">
+                    This name will appear on all restock orders and in the dashboard header.
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
+                    <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
                       Operating Timezone
                     </label>
                     <select
                       value={timezone}
                       onChange={(e) => setTimezone(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors"
                     >
                       {TIMEZONES.map((tz) => (
-                        <option key={tz.value} value={tz.value} className="bg-[#14141a]">
+                        <option key={tz.value} value={tz.value} className="bg-[#121218]">
                           {tz.label}
                         </option>
                       ))}
@@ -342,16 +442,16 @@ export default function SettingsPage() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
+                    <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
                       Base Valuation Currency
                     </label>
                     <select
                       value={currency}
                       onChange={(e) => setCurrency(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors font-mono"
+                      className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors"
                     >
                       {CURRENCIES.map((c) => (
-                        <option key={c.value} value={c.value} className="bg-[#14141a]">
+                        <option key={c.value} value={c.value} className="bg-[#121218]">
                           {c.label}
                         </option>
                       ))}
@@ -359,15 +459,23 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
-                {/* Readonly Tenant Metadata */}
-                <div className="p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)] grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs text-[#97979d]">
+                {/* Readonly Store Info */}
+                <div className="p-4 rounded-xl bg-[#0b0b0f] border border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-[#97979d]">
                   <div>
-                    <span className="text-[10px] text-[#5c5c64] uppercase block">TENANT RECORD ID</span>
-                    <span className="text-[#e8e6e3] mt-0.5 block truncate">{store?.id}</span>
+                    <span className="text-[10px] uppercase font-semibold text-[#71717a] block">
+                      Store Unique Identifier
+                    </span>
+                    <span className="text-[#f4f4f5] font-mono mt-0.5 block truncate">
+                      {store?.id || "N/A"}
+                    </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-[#5c5c64] uppercase block">DATABASE LEDGER</span>
-                    <span className="text-[#4aba7a] mt-0.5 block">PostgreSQL 16 Multi-Tenant</span>
+                    <span className="text-[10px] uppercase font-semibold text-[#71717a] block">
+                      Account Status
+                    </span>
+                    <span className="text-[#4aba7a] font-semibold mt-0.5 block">
+                      Active Enterprise License
+                    </span>
                   </div>
                 </div>
 
@@ -375,9 +483,9 @@ export default function SettingsPage() {
                   <button
                     type="submit"
                     disabled={updateStoreMutation.isPending}
-                    className="px-6 py-2.5 rounded-xl text-xs font-mono font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2 shadow-md"
+                    className="px-6 py-2.5 rounded-xl text-xs font-semibold text-[#0c0c0e] bg-gradient-to-r from-[#d4a853] to-[#f5cf7b] hover:scale-[1.02] active:scale-100 transition-all disabled:opacity-50 shadow-md flex items-center gap-2"
                   >
-                    {updateStoreMutation.isPending ? "Saving Changes..." : "Save Organization Settings"}
+                    {updateStoreMutation.isPending ? "Saving Changes..." : "Save Store Details"}
                   </button>
                 </div>
               </form>
@@ -385,69 +493,85 @@ export default function SettingsPage() {
           )}
 
           {/* ═══════════════════════════════════════════ */}
-          {/* TAB 2: SECURITY & OPERATOR ACCESS           */}
+          {/* TAB 2: SECURITY & SESSION                   */}
           {/* ═══════════════════════════════════════════ */}
           {activeTab === "security" && (
             <div className="space-y-6">
-              {/* Operator Identity Card */}
-              <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-                <h2 className="text-lg font-bold text-[#e8e6e3] tracking-tight">
-                  Operator Credentials & Role
-                </h2>
-                <p className="text-xs text-[#97979d] mt-1">
-                  Active authentication session and cryptographic tenant role.
+              {/* Active Session & Operator Identity */}
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4aba7a]" />
+                  <h2 className="text-base font-bold text-[#f4f4f5]">
+                    Active Operator Session
+                  </h2>
+                </div>
+                <p className="text-xs text-[#97979d]">
+                  Currently authenticated account details and session controls.
                 </p>
 
-                <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)]">
+                <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#0b0b0f] border border-white/5">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#d4a853] to-[#8c6b2d] flex items-center justify-center text-sm font-bold text-[#0c0c0e]">
-                      {(user?.email?.[0] || "O").toUpperCase()}
+                      {(user?.email?.[0] || "U").toUpperCase()}
                     </div>
                     <div>
-                      <span className="text-sm font-semibold text-[#e8e6e3] block">
+                      <div className="text-xs font-bold text-[#f4f4f5]">
                         {user?.email}
-                      </span>
-                      <span className="text-[10px] font-mono text-[#5c5c64] block mt-0.5">
-                        USER ID: {user?.id}
-                      </span>
+                      </div>
+                      <div className="text-[11px] text-[#71717a] mt-0.5">
+                        Role: <span className="text-[#e8e6e3] font-medium">{user?.role || "Administrator"}</span>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono font-semibold bg-[#d4a853]/15 text-[#d4a853] border border-[#d4a853]/30 uppercase">
-                      ROLE: {user?.role || "Owner"}
-                    </span>
-                    <span className="px-2.5 py-1 rounded-full text-[10px] font-mono bg-[#4aba7a]/15 text-[#4aba7a] border border-[#4aba7a]/30">
-                      Active Session
-                    </span>
-                  </div>
+                  {/* Alternative Logout Button on Settings Page */}
+                  <button
+                    onClick={async () => {
+                      try {
+                        await logout();
+                      } finally {
+                        navigate("/", { replace: true });
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[#f87171] hover:text-white bg-[#d45a4a]/15 hover:bg-[#d45a4a] border border-[#d45a4a]/30 transition-all flex items-center gap-2 self-start sm:self-auto"
+                    title="Sign out of your account"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    <span>Log Out from Account</span>
+                  </button>
                 </div>
               </div>
 
-              {/* Password Rotation Card */}
-              <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-                <h3 className="text-base font-bold text-[#e8e6e3] tracking-tight">
-                  Rotate Password
-                </h3>
-                <p className="text-xs text-[#97979d] mt-1">
-                  Ensure your account uses a strong cryptographic password with at least 8 characters.
+              {/* Password Change Form */}
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                  <h3 className="text-base font-bold text-[#f4f4f5]">
+                    Change Password
+                  </h3>
+                </div>
+                <p className="text-xs text-[#97979d]">
+                  Ensure your account uses a secure password with at least 8 characters.
                 </p>
 
                 {passwordSuccess && (
-                  <div className="mt-4 p-3 rounded-xl bg-[rgba(74,186,122,0.12)] border border-[rgba(74,186,122,0.3)] text-xs font-mono text-[#4aba7a]">
-                    Password updated successfully. Next session will require the updated password.
+                  <div className="mt-4 p-3.5 rounded-xl bg-[#4aba7a]/15 border border-[#4aba7a]/30 text-xs text-[#4aba7a] flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+                    <span>Password updated successfully!</span>
                   </div>
                 )}
 
                 {passwordError && (
-                  <div className="mt-4 p-3 rounded-xl bg-[rgba(212,90,74,0.12)] border border-[rgba(212,90,74,0.3)] text-xs font-mono text-[#d45a4a]">
+                  <div className="mt-4 p-3.5 rounded-xl bg-[#d45a4a]/15 border border-[#d45a4a]/30 text-xs text-[#f87171]">
                     {passwordError}
                   </div>
                 )}
 
                 <form onSubmit={handleChangePassword} className="mt-6 space-y-4">
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
+                    <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
                       Current Password
                     </label>
                     <input
@@ -456,13 +580,13 @@ export default function SettingsPage() {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••••••"
-                      className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors font-mono"
+                      className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853]"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
+                      <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
                         New Password
                       </label>
                       <input
@@ -471,13 +595,13 @@ export default function SettingsPage() {
                         minLength={8}
                         value={newPassword}
                         onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Min 8 characters"
-                        className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors font-mono"
+                        placeholder="At least 8 characters"
+                        className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853]"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
+                      <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
                         Confirm New Password
                       </label>
                       <input
@@ -486,8 +610,8 @@ export default function SettingsPage() {
                         minLength={8}
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Re-enter password"
-                        className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors font-mono"
+                        placeholder="Re-enter new password"
+                        className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853]"
                       />
                     </div>
                   </div>
@@ -496,9 +620,9 @@ export default function SettingsPage() {
                     <button
                       type="submit"
                       disabled={changePasswordMutation.isPending}
-                      className="px-6 py-2.5 rounded-xl text-xs font-mono font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2 shadow-md"
+                      className="px-6 py-2.5 rounded-xl text-xs font-semibold text-[#0c0c0e] bg-gradient-to-r from-[#d4a853] to-[#f5cf7b] hover:scale-[1.02] active:scale-100 transition-all disabled:opacity-50 shadow-md"
                     >
-                      {changePasswordMutation.isPending ? "Updating Password..." : "Update Password"}
+                      {changePasswordMutation.isPending ? "Updating..." : "Update Password"}
                     </button>
                   </div>
                 </form>
@@ -507,29 +631,35 @@ export default function SettingsPage() {
           )}
 
           {/* ═══════════════════════════════════════════ */}
-          {/* TAB 3: WAREHOUSE & INVENTORY POLICIES       */}
+          {/* TAB 3: INVENTORY POLICIES                   */}
           {/* ═══════════════════════════════════════════ */}
           {activeTab === "inventory" && (
-            <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-              <h2 className="text-lg font-bold text-[#e8e6e3] tracking-tight">
-                Autonomous Restock & Inventory Policies
-              </h2>
-              <p className="text-xs text-[#97979d] mt-1">
-                Configure safety margins, reorder trigger algorithms, and physical dispatch constraints.
+            <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                <h2 className="text-base font-bold text-[#f4f4f5]">
+                  Automated Replenishment & Inventory Policies
+                </h2>
+              </div>
+              <p className="text-xs text-[#97979d]">
+                Configure buffer margins, lead-time thresholds, and purchase order drafting.
               </p>
 
               {inventorySuccess && (
-                <div className="mt-4 p-3 rounded-xl bg-[rgba(74,186,122,0.12)] border border-[rgba(74,186,122,0.3)] text-xs font-mono text-[#4aba7a]">
-                  Warehouse replenishment policies saved successfully.
+                <div className="mt-4 p-3.5 rounded-xl bg-[#4aba7a]/15 border border-[#4aba7a]/30 text-xs text-[#4aba7a] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+                  <span>Replenishment policies saved successfully.</span>
                 </div>
               )}
 
               <form onSubmit={handleSaveInventory} className="mt-6 space-y-6">
-                {/* Safety Buffer Horizon Slider */}
-                <div className="p-5 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)]">
-                  <div className="flex justify-between items-center text-xs font-mono mb-2">
-                    <span className="text-[#e8e6e3] font-semibold">DEFAULT SAFETY BUFFER HORIZON</span>
-                    <span className="text-[#d4a853] font-bold text-sm">{safetyBufferDays} Days</span>
+                {/* Safety Buffer Slider */}
+                <div className="p-5 rounded-xl bg-[#0b0b0f] border border-white/5">
+                  <div className="flex justify-between items-center text-xs mb-2">
+                    <span className="font-semibold text-[#e8e6e3]">Default Safety Stock Buffer</span>
+                    <span className="font-bold text-sm text-[#f5cf7b] bg-[#d4a853]/15 px-2.5 py-0.5 rounded-lg border border-[#d4a853]/30">
+                      {safetyBufferDays} Days
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -538,18 +668,20 @@ export default function SettingsPage() {
                     step={1}
                     value={safetyBufferDays}
                     onChange={(e) => setSafetyBufferDays(Number(e.target.value))}
-                    className="w-full h-1.5 bg-[#202028] rounded-lg appearance-none cursor-pointer accent-[#d4a853]"
+                    className="w-full h-1.5 bg-[#252532] rounded-lg appearance-none cursor-pointer accent-[#d4a853]"
                   />
-                  <span className="text-[10px] text-[#5c5c64] font-mono mt-1.5 block">
-                    Defines baseline safety stock buffer days calculated by the Bayesian demand forecasting models.
+                  <span className="text-[11px] text-[#71717a] mt-2 block">
+                    Calculates required stock buffer based on supplier lead times and seasonal demand swings.
                   </span>
                 </div>
 
-                {/* Stockout Warning Horizon */}
-                <div className="p-5 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)]">
-                  <div className="flex justify-between items-center text-xs font-mono mb-2">
-                    <span className="text-[#e8e6e3] font-semibold">CRITICAL LOW-STOCK WARNING MARGIN</span>
-                    <span className="text-[#d45a4a] font-bold text-sm">{lowStockDays} Days</span>
+                {/* Low Stock Threshold Slider */}
+                <div className="p-5 rounded-xl bg-[#0b0b0f] border border-white/5">
+                  <div className="flex justify-between items-center text-xs mb-2">
+                    <span className="font-semibold text-[#e8e6e3]">Critical Low-Stock Alert Window</span>
+                    <span className="font-bold text-sm text-[#f87171] bg-[#d45a4a]/15 px-2.5 py-0.5 rounded-lg border border-[#d45a4a]/30">
+                      {lowStockDays} Days
+                    </span>
                   </div>
                   <input
                     type="range"
@@ -558,45 +690,45 @@ export default function SettingsPage() {
                     step={1}
                     value={lowStockDays}
                     onChange={(e) => setLowStockDays(Number(e.target.value))}
-                    className="w-full h-1.5 bg-[#202028] rounded-lg appearance-none cursor-pointer accent-[#d45a4a]"
+                    className="w-full h-1.5 bg-[#252532] rounded-lg appearance-none cursor-pointer accent-[#d45a4a]"
                   />
-                  <span className="text-[10px] text-[#5c5c64] font-mono mt-1.5 block">
-                    Any SKU projected to deplete below this threshold triggers priority dispatch flags and anomaly alerts.
+                  <span className="text-[11px] text-[#71717a] mt-2 block">
+                    Any product projected to deplete within this timeframe triggers high-priority stockout warnings.
                   </span>
                 </div>
 
-                {/* Policy Toggles */}
-                <div className="space-y-4 pt-2">
-                  <label className="flex items-start gap-3 p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)] cursor-pointer">
+                {/* Toggles */}
+                <div className="space-y-3 pt-2">
+                  <label className="flex items-start gap-3 p-4 rounded-xl bg-[#0b0b0f] border border-white/5 cursor-pointer hover:border-white/10 transition-colors">
                     <input
                       type="checkbox"
                       checked={autoReorder}
                       onChange={(e) => setAutoReorder(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded text-[#d4a853] bg-[#1a1a22] border-[rgba(255,255,255,0.2)] focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      className="mt-0.5 w-4 h-4 rounded text-[#d4a853] bg-[#1a1a24] border-white/20 focus:ring-0 cursor-pointer"
                     />
                     <div>
                       <span className="text-xs font-semibold text-[#e8e6e3] block">
-                        Autonomous Purchase Order Generation
+                        Automated Purchase Order Recommendations
                       </span>
-                      <span className="text-[11px] text-[#97979d] block mt-0.5">
-                        Automatically synthesize recommended PO batches when inventory breaches calculated trigger points.
+                      <span className="text-[11px] text-[#71717a] block mt-0.5">
+                        Generate pre-populated restock PO recommendations when inventory hits calculated thresholds.
                       </span>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)] cursor-pointer">
+                  <label className="flex items-start gap-3 p-4 rounded-xl bg-[#0b0b0f] border border-white/5 cursor-pointer hover:border-white/10 transition-colors">
                     <input
                       type="checkbox"
                       checked={blockNegative}
                       onChange={(e) => setBlockNegative(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded text-[#d4a853] bg-[#1a1a22] border-[rgba(255,255,255,0.2)] focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                      className="mt-0.5 w-4 h-4 rounded text-[#d4a853] bg-[#1a1a24] border-white/20 focus:ring-0 cursor-pointer"
                     />
                     <div>
                       <span className="text-xs font-semibold text-[#e8e6e3] block">
-                        Block Negative Physical Inventory
+                        Prevent Negative Inventory Quantities
                       </span>
-                      <span className="text-[11px] text-[#97979d] block mt-0.5">
-                        Prevent barcode dispatch scans from recording negative bin quantities in the PostgreSQL ledger.
+                      <span className="text-[11px] text-[#71717a] block mt-0.5">
+                        Disallow outbound orders from recording negative on-hand quantities during stock syncs.
                       </span>
                     </div>
                   </label>
@@ -605,9 +737,9 @@ export default function SettingsPage() {
                 <div className="pt-2 flex justify-end">
                   <button
                     type="submit"
-                    className="px-6 py-2.5 rounded-xl text-xs font-mono font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all shadow-md"
+                    className="px-6 py-2.5 rounded-xl text-xs font-semibold text-[#0c0c0e] bg-gradient-to-r from-[#d4a853] to-[#f5cf7b] hover:scale-[1.02] active:scale-100 transition-all shadow-md"
                   >
-                    Save Warehouse Policies
+                    Save Inventory Policies
                   </button>
                 </div>
               </form>
@@ -615,90 +747,81 @@ export default function SettingsPage() {
           )}
 
           {/* ═══════════════════════════════════════════ */}
-          {/* TAB 4: ALERTS & NOTIFICATIONS               */}
+          {/* TAB 4: NOTIFICATIONS & ALERTS               */}
           {/* ═══════════════════════════════════════════ */}
           {activeTab === "notifications" && (
-            <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-              <h2 className="text-lg font-bold text-[#e8e6e3] tracking-tight">
-                Alert Subscriptions & Sentinel Routing
-              </h2>
-              <p className="text-xs text-[#97979d] mt-1">
-                Configure real-time event triggers, email dispatches, and warehouse alert thresholds.
+            <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                <h2 className="text-base font-bold text-[#f4f4f5]">
+                  Alerts & Notification Preferences
+                </h2>
+              </div>
+              <p className="text-xs text-[#97979d]">
+                Choose which inventory events trigger alerts and email digests.
               </p>
 
               {notifySuccess && (
-                <div className="mt-4 p-3 rounded-xl bg-[rgba(74,186,122,0.12)] border border-[rgba(74,186,122,0.3)] text-xs font-mono text-[#4aba7a]">
-                  Notification preferences saved.
+                <div className="mt-4 p-3.5 rounded-xl bg-[#4aba7a]/15 border border-[#4aba7a]/30 text-xs text-[#4aba7a] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+                  <span>Notification preferences saved.</span>
                 </div>
               )}
 
-              <form onSubmit={handleSaveNotifications} className="mt-6 space-y-4">
-                <label className="flex items-center justify-between p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)] cursor-pointer">
-                  <div>
-                    <span className="text-xs font-semibold text-[#e8e6e3] block">Critical Stockout Warnings</span>
-                    <span className="text-[11px] text-[#97979d] block mt-0.5">
-                      Immediate alert when any active SKU drops below 48 hours of estimated demand.
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={notifyStockout}
-                    onChange={(e) => setNotifyStockout(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#d4a853] bg-[#1a1a22] border-[rgba(255,255,255,0.2)] focus:ring-0 cursor-pointer"
-                  />
-                </label>
+              <form onSubmit={handleSaveNotifications} className="mt-6 space-y-3">
+                {[
+                  {
+                    title: "Critical Stockout Warnings",
+                    desc: "Immediate alert when any active product falls below 48 hours of inventory buffer.",
+                    checked: notifyStockout,
+                    onChange: setNotifyStockout,
+                  },
+                  {
+                    title: "Demand Surge & Anomaly Alerts",
+                    desc: "Trigger notifications when sales velocity exceeds normal historical standard deviations.",
+                    checked: notifyAnomaly,
+                    onChange: setNotifyAnomaly,
+                  },
+                  {
+                    title: "Supplier Lead-Time Warnings",
+                    desc: "Flag potential delays when vendor delivery times exceed agreed SLA schedules.",
+                    checked: notifyLeadTime,
+                    onChange: setNotifyLeadTime,
+                  },
+                  {
+                    title: "Weekly Executive Digest",
+                    desc: "Summary report of inventory turnover, dead stock reduction, and recommended purchases.",
+                    checked: weeklyDigest,
+                    onChange: setWeeklyDigest,
+                  },
+                ].map((item, idx) => (
+                  <label
+                    key={idx}
+                    className="flex items-center justify-between p-4 rounded-xl bg-[#0b0b0f] border border-white/5 cursor-pointer hover:border-white/10 transition-colors"
+                  >
+                    <div className="pr-4">
+                      <span className="text-xs font-semibold text-[#e8e6e3] block">
+                        {item.title}
+                      </span>
+                      <span className="text-[11px] text-[#71717a] block mt-0.5">
+                        {item.desc}
+                      </span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={item.checked}
+                      onChange={(e) => item.onChange(e.target.checked)}
+                      className="w-4 h-4 rounded text-[#d4a853] bg-[#1a1a24] border-white/20 focus:ring-0 cursor-pointer"
+                    />
+                  </label>
+                ))}
 
-                <label className="flex items-center justify-between p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)] cursor-pointer">
-                  <div>
-                    <span className="text-xs font-semibold text-[#e8e6e3] block">Demand Surge Anomaly Alerts</span>
-                    <span className="text-[11px] text-[#97979d] block mt-0.5">
-                      Trigger notification when sudden consumption exceeds 3 standard deviations from the baseline.
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={notifyAnomaly}
-                    onChange={(e) => setNotifyAnomaly(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#d4a853] bg-[#1a1a22] border-[rgba(255,255,255,0.2)] focus:ring-0 cursor-pointer"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)] cursor-pointer">
-                  <div>
-                    <span className="text-xs font-semibold text-[#e8e6e3] block">Supplier Lead-Time Breach Warning</span>
-                    <span className="text-[11px] text-[#97979d] block mt-0.5">
-                      Flag shipments where supplier historical delivery transit exceeds agreed SLA windows.
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={notifyLeadTime}
-                    onChange={(e) => setNotifyLeadTime(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#d4a853] bg-[#1a1a22] border-[rgba(255,255,255,0.2)] focus:ring-0 cursor-pointer"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)] cursor-pointer">
-                  <div>
-                    <span className="text-xs font-semibold text-[#e8e6e3] block">Weekly Executive Telemetry Digest</span>
-                    <span className="text-[11px] text-[#97979d] block mt-0.5">
-                      Condensed overview of stock turnover, dead stock reduction, and procurement efficiency.
-                    </span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={weeklyDigest}
-                    onChange={(e) => setWeeklyDigest(e.target.checked)}
-                    className="w-4 h-4 rounded text-[#d4a853] bg-[#1a1a22] border-[rgba(255,255,255,0.2)] focus:ring-0 cursor-pointer"
-                  />
-                </label>
-
-                <div className="pt-2 flex justify-end">
+                <div className="pt-3 flex justify-end">
                   <button
                     type="submit"
-                    className="px-6 py-2.5 rounded-xl text-xs font-mono font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all shadow-md"
+                    className="px-6 py-2.5 rounded-xl text-xs font-semibold text-[#0c0c0e] bg-gradient-to-r from-[#d4a853] to-[#f5cf7b] hover:scale-[1.02] active:scale-100 transition-all shadow-md"
                   >
-                    Save Alert Preferences
+                    Save Notification Rules
                   </button>
                 </div>
               </form>
@@ -706,44 +829,47 @@ export default function SettingsPage() {
           )}
 
           {/* ═══════════════════════════════════════════ */}
-          {/* TAB 5: API & WEBHOOK INTEGRATIONS           */}
+          {/* TAB 5: API & WEBHOOKS                       */}
           {/* ═══════════════════════════════════════════ */}
           {activeTab === "integrations" && (
             <div className="space-y-6">
-              <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-                <h2 className="text-lg font-bold text-[#e8e6e3] tracking-tight">
-                  Developer Credentials & Tenant Keys
-                </h2>
-                <p className="text-xs text-[#97979d] mt-1">
-                  Authenticate warehouse barcode scanners, conveyors, and external ERP systems via REST / Webhook protocols.
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                  <h2 className="text-base font-bold text-[#f4f4f5]">
+                    API Keys & Store Identifier
+                  </h2>
+                </div>
+                <p className="text-xs text-[#97979d]">
+                  Use these credentials to connect external e-commerce platforms, ERPs, or barcode scanners.
                 </p>
 
                 <div className="mt-6 space-y-4">
-                  {/* Tenant ID */}
+                  {/* Store Identifier */}
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
-                      Tenant Identifier
+                    <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
+                      Store Identifier (Tenant ID)
                     </label>
                     <div className="flex items-center gap-2">
                       <input
                         type="text"
                         readOnly
                         value={store?.id || ""}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl text-xs font-mono bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] select-all"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl text-xs font-mono bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 select-all"
                       />
                       <button
                         type="button"
                         onClick={handleCopyTenantId}
-                        className="px-4 py-2.5 rounded-xl text-xs font-mono bg-[#1c1c24] hover:bg-[#252530] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] transition-colors"
+                        className="px-4 py-2.5 rounded-xl text-xs font-medium bg-[#1a1a24] hover:bg-[#252532] text-[#f4f4f5] border border-white/10 transition-colors"
                       >
                         {tenantIdCopied ? "Copied!" : "Copy"}
                       </button>
                     </div>
                   </div>
 
-                  {/* Production Secret Key */}
+                  {/* API Secret Key */}
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
+                    <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
                       Production API Secret Key
                     </label>
                     <div className="flex items-center gap-2">
@@ -751,19 +877,19 @@ export default function SettingsPage() {
                         type="text"
                         readOnly
                         value={apiKeyRevealed ? simulatedApiKey : "sp_live_••••••••••••••••••••••••"}
-                        className="flex-1 px-3.5 py-2.5 rounded-xl text-xs font-mono bg-[#0c0c0e] text-[#d4a853] border border-[rgba(255,255,255,0.1)] select-all"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl text-xs font-mono bg-[#0b0b0f] text-[#f5cf7b] border border-white/10 select-all"
                       />
                       <button
                         type="button"
                         onClick={() => setApiKeyRevealed(!apiKeyRevealed)}
-                        className="px-3.5 py-2.5 rounded-xl text-xs font-mono bg-[#1c1c24] hover:bg-[#252530] text-[#97979d] hover:text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] transition-colors"
+                        className="px-3.5 py-2.5 rounded-xl text-xs font-medium bg-[#1a1a24] hover:bg-[#252532] text-[#97979d] hover:text-[#f4f4f5] border border-white/10 transition-colors"
                       >
                         {apiKeyRevealed ? "Hide" : "Reveal"}
                       </button>
                       <button
                         type="button"
                         onClick={handleCopyApiKey}
-                        className="px-4 py-2.5 rounded-xl text-xs font-mono bg-[#1c1c24] hover:bg-[#252530] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] transition-colors"
+                        className="px-4 py-2.5 rounded-xl text-xs font-medium bg-[#1a1a24] hover:bg-[#252532] text-[#f4f4f5] border border-white/10 transition-colors"
                       >
                         {apiKeyCopied ? "Copied!" : "Copy"}
                       </button>
@@ -772,19 +898,22 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Webhook Configuration Card */}
-              <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-                <h3 className="text-base font-bold text-[#e8e6e3] tracking-tight">
-                  Outbound Event Webhooks
-                </h3>
-                <p className="text-xs text-[#97979d] mt-1">
-                  Deliver instantaneous JSON telemetry events (`inventory.updated`, `po.created`, `anomaly.flagged`).
+              {/* Webhooks Card */}
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#4aba7a]" />
+                  <h3 className="text-base font-bold text-[#f4f4f5]">
+                    Outbound Webhook Endpoints
+                  </h3>
+                </div>
+                <p className="text-xs text-[#97979d]">
+                  Receive real-time JSON payloads for restock approvals and inventory changes.
                 </p>
 
                 <div className="mt-5 space-y-4">
                   <div>
-                    <label className="block text-[11px] font-mono uppercase text-[#97979d] mb-1.5 tracking-wider">
-                      Target Webhook HTTPS Endpoint
+                    <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
+                      Webhook Target URL
                     </label>
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <input
@@ -794,31 +923,31 @@ export default function SettingsPage() {
                           setWebhookUrl(e.target.value);
                           localStorage.setItem("sp_webhook_url", e.target.value);
                         }}
-                        placeholder="https://your-erp.com/api/stockpilot-hook"
-                        className="flex-1 px-3.5 py-2.5 rounded-xl text-xs font-mono bg-[#0c0c0e] text-[#e8e6e3] border border-[rgba(255,255,255,0.1)] focus:outline-none focus:border-[#d4a853]"
+                        placeholder="https://your-store.com/api/stockpilot-hook"
+                        className="flex-1 px-3.5 py-2.5 rounded-xl text-xs font-mono bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853]"
                       />
                       <button
                         type="button"
                         onClick={handleTestPing}
                         disabled={pingStatus === "pinging"}
-                        className="px-4 py-2.5 rounded-xl text-xs font-mono font-medium text-[#e8e6e3] bg-[#1c1c24] hover:bg-[#252530] border border-[rgba(255,255,255,0.1)] transition-all flex items-center justify-center gap-1.5"
+                        className="px-4 py-2.5 rounded-xl text-xs font-medium text-[#f4f4f5] bg-[#1a1a24] hover:bg-[#252532] border border-white/10 transition-all flex items-center justify-center gap-2"
                       >
                         {pingStatus === "pinging" ? (
                           <>
                             <span className="w-3 h-3 border-2 border-[#d4a853] border-t-transparent rounded-full animate-spin" />
-                            Pinging...
+                            <span>Pinging...</span>
                           </>
                         ) : (
-                          "Send Test Ping"
+                          "Send Test Event"
                         )}
                       </button>
                     </div>
                   </div>
 
                   {pingStatus === "success" && (
-                    <div className="p-3 rounded-xl bg-[rgba(74,186,122,0.1)] border border-[rgba(74,186,122,0.25)] text-xs font-mono text-[#4aba7a] flex items-center justify-between">
-                      <span>✓ Webhook Payload Accepted: HTTP 200 OK</span>
-                      <span>Latency: 18ms</span>
+                    <div className="p-3.5 rounded-xl bg-[#4aba7a]/15 border border-[#4aba7a]/30 text-xs text-[#4aba7a] flex items-center justify-between">
+                      <span>✓ Webhook event delivered: HTTP 200 OK</span>
+                      <span className="font-mono text-[11px]">Latency: 16ms</span>
                     </div>
                   )}
                 </div>
@@ -827,85 +956,70 @@ export default function SettingsPage() {
           )}
 
           {/* ═══════════════════════════════════════════ */}
-          {/* TAB 6: DATA MANAGEMENT & DANGER ZONE       */}
+          {/* TAB 6: DATA & WORKSPACE MANAGEMENT         */}
           {/* ═══════════════════════════════════════════ */}
           {activeTab === "data" && (
             <div className="space-y-6">
-              {/* Data Export Card */}
-              <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(255,255,255,0.08)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-                <h2 className="text-lg font-bold text-[#e8e6e3] tracking-tight">
-                  Data Portability & Export
-                </h2>
-                <p className="text-xs text-[#97979d] mt-1">
-                  Export complete snapshots of your active warehouse ledger, inventory levels, and transaction logs.
+              {/* CSV Export */}
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                  <h2 className="text-base font-bold text-[#f4f4f5]">
+                    Export Store Inventory Data
+                  </h2>
+                </div>
+                <p className="text-xs text-[#97979d]">
+                  Export a complete snapshot of all active products, current stock, and safety buffers.
                 </p>
 
-                <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#0c0c0e] border border-[rgba(255,255,255,0.06)]">
+                <div className="mt-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#0b0b0f] border border-white/5">
                   <div>
-                    <span className="text-sm font-semibold text-[#e8e6e3] block">
-                      Full Inventory & Safety Stock CSV
+                    <span className="text-xs font-bold text-[#f4f4f5] block">
+                      Product Catalog & Inventory CSV
                     </span>
-                    <span className="text-xs text-[#97979d] block mt-0.5">
-                      Contains SKU identifiers, bay coordinates, reorder triggers, and current stock.
+                    <span className="text-[11px] text-[#71717a] block mt-0.5">
+                      Formatted for Microsoft Excel, Google Sheets, or warehouse imports.
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={handleExportCSV}
-                    className="px-4 py-2 rounded-xl text-xs font-mono font-medium text-[#e8e6e3] bg-[#1c1c24] hover:bg-[#252530] border border-[rgba(255,255,255,0.1)] transition-colors flex items-center gap-2"
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[#f4f4f5] bg-[#1a1a24] hover:bg-[#252532] border border-white/10 transition-colors flex items-center gap-2 self-start sm:self-auto"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5 text-[#d4a853]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
-                    Download CSV
+                    <span>Download CSV</span>
                   </button>
                 </div>
               </div>
 
               {/* Danger Zone */}
-              <div className="p-6 md:p-8 rounded-2xl bg-[#14141a] border border-[rgba(212,90,74,0.3)] shadow-[0_20px_60px_rgba(0,0,0,0.5)]">
-                <div className="flex items-center gap-2 text-[#d45a4a]">
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-[#d45a4a]/30 shadow-2xl">
+                <div className="flex items-center gap-2 text-[#f87171] mb-1">
                   <span className="w-2 h-2 rounded-full bg-[#d45a4a]" />
-                  <h3 className="text-base font-bold tracking-tight">Danger Zone</h3>
+                  <h3 className="text-base font-bold">Danger Zone</h3>
                 </div>
-                <p className="text-xs text-[#97979d] mt-1">
-                  Destructive operations requiring explicit administrator confirmation.
+                <p className="text-xs text-[#97979d]">
+                  Irreversible actions regarding store data and mock simulation records.
                 </p>
 
-                <div className="mt-5 space-y-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[rgba(212,90,74,0.05)] border border-[rgba(212,90,74,0.15)]">
+                <div className="mt-5 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl bg-[#d45a4a]/5 border border-[#d45a4a]/20">
                     <div>
-                      <span className="text-xs font-semibold text-[#e8e6e3] block">
-                        Purge Demo & Simulated Transactions
+                      <span className="text-xs font-semibold text-[#f4f4f5] block">
+                        Clear Simulated Demo Data
                       </span>
-                      <span className="text-[11px] text-[#97979d] block mt-0.5">
-                        Removes generated mock sales records while retaining catalog master products and suppliers.
+                      <span className="text-[11px] text-[#71717a] block mt-0.5">
+                        Removes mock orders and forecasts while keeping your real master products intact.
                       </span>
                     </div>
                     <button
                       type="button"
-                      onClick={() => alert("Demo data purge requested. Confirmation code required in production.")}
-                      className="px-3.5 py-2 rounded-xl text-xs font-mono font-medium text-[#d45a4a] hover:text-[#fff] bg-[rgba(212,90,74,0.1)] hover:bg-[#d45a4a] border border-[rgba(212,90,74,0.3)] transition-colors"
+                      onClick={() => alert("Simulation cache reset. Current catalog is clean.")}
+                      className="px-3.5 py-2 rounded-xl text-xs font-semibold text-[#f87171] hover:text-white bg-[#d45a4a]/15 hover:bg-[#d45a4a] border border-[#d45a4a]/30 transition-all self-start sm:self-auto"
                     >
-                      Purge Demo Records
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-[rgba(212,90,74,0.05)] border border-[rgba(212,90,74,0.15)]">
-                    <div>
-                      <span className="text-xs font-semibold text-[#e8e6e3] block">
-                        Deactivate Facility Workspace
-                      </span>
-                      <span className="text-[11px] text-[#97979d] block mt-0.5">
-                        Immediately locks all operator access and schedules tenant storage for cryptographically shredded disposal.
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => alert("Tenant workspace deactivation requires master owner multi-factor approval.")}
-                      className="px-3.5 py-2 rounded-xl text-xs font-mono font-medium text-[#d45a4a] hover:text-[#fff] bg-[rgba(212,90,74,0.1)] hover:bg-[#d45a4a] border border-[rgba(212,90,74,0.3)] transition-colors"
-                    >
-                      Deactivate Tenant
+                      Clear Mock Records
                     </button>
                   </div>
                 </div>

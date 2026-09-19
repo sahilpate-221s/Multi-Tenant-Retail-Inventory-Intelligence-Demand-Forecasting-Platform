@@ -1,14 +1,306 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useState, Suspense, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Float, MeshDistortMaterial, MeshTransmissionMaterial, Stars } from "@react-three/drei";
+import * as THREE from "three";
 
-/* ═══════════════════════════════════════════════════════════════
-   APPLE-GRADE INTERACTIVE SPATIAL WAREHOUSE CANVAS
-   Bespoke perspective-rendered high-density inventory bay array
-   with laser scanner sweep, live bay telemetry, and mouse tilt.
-   ═══════════════════════════════════════════════════════════════ */
-function AppleSpatialWarehouseCanvas({ velocity = 1 }: { velocity?: number }) {
+/* ═══════════════════════════════════════════════════════════════════════════
+   3D COMPONENTS
+═══════════════════════════════════════════════════════════════════════════ */
+
+/** Camera that responds to mouse movement */
+function MouseCamera({ mouseX, mouseY }: { mouseX: number; mouseY: number }) {
+  const { camera } = useThree();
+  const pos = useRef({ x: 0, y: 2.2, z: 6 });
+
+  useFrame(() => {
+    pos.current.x += (mouseX * 0.6 - pos.current.x) * 0.02;
+    pos.current.y += (2.2 + mouseY * 0.3 - pos.current.y) * 0.02;
+    camera.position.set(pos.current.x, pos.current.y, pos.current.z);
+    camera.lookAt(0, 0.3, 0);
+  });
+
+  return null;
+}
+
+/** Orbiting amber torus ring with data nodes */
+function DataRing({ radius = 1.8, nodeCount = 12 }: { radius?: number; nodeCount?: number }) {
+  const ref = useRef<THREE.Group>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = clock.getElapsedTime() * 0.15;
+    ref.current.rotation.x = Math.sin(clock.getElapsedTime() * 0.3) * 0.08;
+  });
+
+  return (
+    <group ref={ref} position={[0, 0.5, 0]}>
+      <mesh>
+        <torusGeometry args={[radius, 0.008, 16, 100]} />
+        <meshStandardMaterial
+          color="#d4a853"
+          emissive="#d4a853"
+          emissiveIntensity={0.8}
+          transparent
+          opacity={0.6}
+        />
+      </mesh>
+      <mesh rotation={[0.4, 0, 0.6]}>
+        <torusGeometry args={[radius * 1.15, 0.005, 12, 80]} />
+        <meshStandardMaterial
+          color="#6b8cc7"
+          emissive="#6b8cc7"
+          emissiveIntensity={0.4}
+          transparent
+          opacity={0.35}
+        />
+      </mesh>
+      <mesh rotation={[0.8, 0.3, 0.2]}>
+        <torusGeometry args={[radius * 0.85, 0.004, 12, 60]} />
+        <meshStandardMaterial
+          color="#4aba7a"
+          emissive="#4aba7a"
+          emissiveIntensity={0.4}
+          transparent
+          opacity={0.3}
+        />
+      </mesh>
+      {Array.from({ length: nodeCount }).map((_, i) => {
+        const angle = (i / nodeCount) * Math.PI * 2;
+        const colors = ["#d4a853", "#4aba7a", "#6b8cc7", "#d45a4a"];
+        const color = colors[i % colors.length];
+        return (
+          <mesh
+            key={i}
+            position={[
+              Math.cos(angle) * radius,
+              Math.sin(angle) * 0.08,
+              Math.sin(angle) * radius,
+            ]}
+          >
+            <sphereGeometry args={[0.025, 12, 12]} />
+            <meshStandardMaterial
+              color={color}
+              emissive={color}
+              emissiveIntensity={2}
+            />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/** Central glowing orb with distortion */
+function CoreOrb() {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = clock.getElapsedTime() * 0.2;
+    ref.current.rotation.z = clock.getElapsedTime() * 0.15;
+  });
+
+  return (
+    <Float speed={1.5} rotationIntensity={0.3} floatIntensity={0.5}>
+      <mesh ref={ref} position={[0, 0.5, 0]}>
+        <icosahedronGeometry args={[0.65, 8]} />
+        <MeshDistortMaterial
+          color="#d4a853"
+          emissive="#d4a853"
+          emissiveIntensity={0.3}
+          roughness={0.2}
+          metalness={0.8}
+          distort={0.25}
+          speed={2}
+          transparent
+          opacity={0.85}
+        />
+      </mesh>
+    </Float>
+  );
+}
+
+/** Glass sphere with refraction */
+function GlassSphere({ position }: { position: [number, number, number] }) {
+  return (
+    <Float speed={2} rotationIntensity={0.2} floatIntensity={0.8}>
+      <mesh position={position}>
+        <sphereGeometry args={[0.3, 32, 32]} />
+        <MeshTransmissionMaterial
+          backside
+          samples={6}
+          resolution={512}
+          transmission={0.95}
+          roughness={0.05}
+          thickness={0.5}
+          ior={1.5}
+          chromaticAberration={0.06}
+          anisotropy={0.1}
+          distortion={0.15}
+          distortionScale={0.3}
+          temporalDistortion={0.2}
+          color="#d4a853"
+        />
+      </mesh>
+    </Float>
+  );
+}
+
+/** Floating warehouse boxes that orbit gently */
+function FloatingBoxes() {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(({ clock }) => {
+    if (!groupRef.current) return;
+    groupRef.current.rotation.y = clock.getElapsedTime() * 0.05;
+  });
+
+  const boxes = [
+    { pos: [-2.5, 0.2, -1] as [number, number, number], size: [0.3, 0.22, 0.25] as [number, number, number], color: "#5a4a30", speed: 1.2 },
+    { pos: [2.3, 0.8, -0.5] as [number, number, number], size: [0.25, 0.18, 0.2] as [number, number, number], color: "#4a3e28", speed: 1.8 },
+    { pos: [-1.8, 1.4, 0.6] as [number, number, number], size: [0.2, 0.15, 0.18] as [number, number, number], color: "#6b5838", speed: 1.5 },
+    { pos: [1.5, -0.2, 1.2] as [number, number, number], size: [0.28, 0.2, 0.22] as [number, number, number], color: "#3d3425", speed: 2.0 },
+    { pos: [0.5, 1.8, -1.5] as [number, number, number], size: [0.18, 0.14, 0.16] as [number, number, number], color: "#544a38", speed: 1.3 },
+    { pos: [-0.8, -0.5, 1.8] as [number, number, number], size: [0.22, 0.17, 0.2] as [number, number, number], color: "#5e5240", speed: 1.7 },
+  ];
+
+  return (
+    <group ref={groupRef}>
+      {boxes.map((b, i) => (
+        <Float key={i} speed={b.speed} rotationIntensity={0.4} floatIntensity={0.6}>
+          <mesh position={b.pos} castShadow>
+            <boxGeometry args={b.size} />
+            <meshStandardMaterial
+              color={b.color}
+              roughness={0.7}
+              metalness={0.15}
+            />
+            {/* Amber shipping label */}
+            {i % 2 === 0 && (
+              <mesh position={[0, 0, b.size[2] / 2 + 0.001]}>
+                <planeGeometry args={[b.size[0] * 0.6, b.size[1] * 0.3]} />
+                <meshBasicMaterial color="#d4a853" opacity={0.5} transparent />
+              </mesh>
+            )}
+          </mesh>
+        </Float>
+      ))}
+    </group>
+  );
+}
+
+/** Sweeping scanner beam */
+function ScannerBeam() {
+  const ref = useRef<THREE.Mesh>(null);
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    const t = clock.getElapsedTime();
+    ref.current.rotation.y = t * 0.4;
+    ref.current.position.y = 0.5 + Math.sin(t * 0.7) * 0.2;
+    (ref.current.material as THREE.MeshBasicMaterial).opacity = 0.15 + Math.sin(t * 2) * 0.08;
+  });
+
+  return (
+    <mesh ref={ref} position={[0, 0.5, 0]}>
+      <planeGeometry args={[8, 0.012]} />
+      <meshBasicMaterial
+        color="#d4a853"
+        transparent
+        opacity={0.2}
+        side={THREE.DoubleSide}
+        depthWrite={false}
+      />
+    </mesh>
+  );
+}
+
+/** Particle field in 3D space */
+function ParticleCloud() {
+  const ref = useRef<THREE.Points>(null);
+  const count = 300;
+
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 14;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 8;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 14;
+
+    const isAmber = Math.random() < 0.3;
+    if (isAmber) {
+      colors[i * 3] = 0.83;
+      colors[i * 3 + 1] = 0.66;
+      colors[i * 3 + 2] = 0.33;
+    } else {
+      colors[i * 3] = 0.6;
+      colors[i * 3 + 1] = 0.6;
+      colors[i * 3 + 2] = 0.65;
+    }
+  }
+
+  useFrame(({ clock }) => {
+    if (!ref.current) return;
+    ref.current.rotation.y = clock.getElapsedTime() * 0.015;
+    ref.current.rotation.x = Math.sin(clock.getElapsedTime() * 0.05) * 0.02;
+  });
+
+  return (
+    <points ref={ref}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+        <bufferAttribute attach="attributes-color" args={[colors, 3]} />
+      </bufferGeometry>
+      <pointsMaterial size={0.025} vertexColors transparent opacity={0.6} sizeAttenuation />
+    </points>
+  );
+}
+
+/** Ground grid */
+function GroundGrid() {
+  return (
+    <>
+      <gridHelper args={[30, 30, "#303038", "#18181c"]} position={[0, -1.5, 0]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -1.51, 0]} receiveShadow>
+        <planeGeometry args={[30, 30]} />
+        <meshStandardMaterial color="#0a0a0c" roughness={0.95} metalness={0.05} />
+      </mesh>
+    </>
+  );
+}
+
+/** Full 3D scene */
+function HeroScene({ mouseX, mouseY }: { mouseX: number; mouseY: number }) {
+  return (
+    <>
+      <MouseCamera mouseX={mouseX} mouseY={mouseY} />
+
+      <ambientLight intensity={0.2} color="#d8d7d4" />
+      <directionalLight position={[5, 8, 4]} intensity={2} color="#fff3dd" castShadow />
+      <directionalLight position={[-5, 4, -4]} intensity={0.7} color="#d0d4de" />
+      <pointLight position={[0, 2, 2]} intensity={2.5} distance={10} decay={2} color="#f3cb75" />
+      <spotLight position={[0, 6, 0]} angle={0.5} penumbra={0.8} intensity={2} color="#d4a853" distance={15} decay={2} />
+
+      <Stars radius={50} depth={50} count={1500} factor={2} saturation={0} fade speed={0.5} />
+      <fog attach="fog" args={["#0a0a0c", 12, 28]} />
+
+      <CoreOrb />
+      <DataRing />
+      <FloatingBoxes />
+      <ScannerBeam />
+      <ParticleCloud />
+      <GroundGrid />
+
+      <GlassSphere position={[-1.8, 1.2, 0.5]} />
+      <GlassSphere position={[2.0, 0.8, -0.8]} />
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BACKGROUND PARTICLES — lightweight canvas for below-the-fold sections
+═══════════════════════════════════════════════════════════════════════════ */
+function BackgroundParticles() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const mouseRef = useRef({ x: 0, y: 0, targetX: 0, targetY: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -17,857 +309,1483 @@ function AppleSpatialWarehouseCanvas({ velocity = 1 }: { velocity?: number }) {
     if (!ctx) return;
 
     let animId: number;
-    let width = 0;
-    let height = 0;
+    let W = 0;
+    let H = 0;
 
-    const setSize = () => {
-      if (!canvas.parentElement) return;
+    const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = canvas.parentElement.clientWidth;
-      height = canvas.parentElement.clientHeight;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+      W = canvas.parentElement?.clientWidth ?? window.innerWidth;
+      H = canvas.parentElement?.clientHeight ?? window.innerHeight;
+      canvas.width = W * dpr;
+      canvas.height = H * dpr;
+      canvas.style.width = W + "px";
+      canvas.style.height = H + "px";
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
+    resize();
+    window.addEventListener("resize", resize);
 
-    setSize();
-    window.addEventListener("resize", setSize);
+    const COUNT = 50;
+    type P = { x: number; y: number; vx: number; vy: number; r: number; amber: boolean };
+    const dots: P[] = Array.from({ length: COUNT }, () => ({
+      x: Math.random() * (W || 1400),
+      y: Math.random() * (H || 3000),
+      vx: (Math.random() - 0.5) * 0.18,
+      vy: (Math.random() - 0.5) * 0.18,
+      r: Math.random() * 1.2 + 0.3,
+      amber: Math.random() < 0.25,
+    }));
 
-    // 4 Aisle tiers x 7 Storage Bays
-    const rows = 4;
-    const cols = 7;
-    const bays: { fill: number; isAmber: boolean; isCrit: boolean; pulseSpeed: number }[] = [];
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const seed = Math.sin(r * 5.7 + c * 3.1) * 0.5 + 0.5;
-        bays.push({
-          fill: seed * 0.7 + 0.25,
-          isAmber: (r + c) % 4 === 0,
-          isCrit: r === 2 && c === 4,
-          pulseSpeed: 1 + seed * 1.5,
-        });
-      }
-    }
-
-    let frame = 0;
-
+    const LINK = 120;
     const render = () => {
-      ctx.clearRect(0, 0, width, height);
-      frame += velocity;
-      const t = frame * 0.02;
-
-      // Mouse smooth interpolation for physical tilt
-      mouseRef.current.x += (mouseRef.current.targetX - mouseRef.current.x) * 0.05;
-      mouseRef.current.y += (mouseRef.current.targetY - mouseRef.current.y) * 0.05;
-      const mX = mouseRef.current.x;
-      const mY = mouseRef.current.y;
-
-      const cx = width * 0.5 + mX * 22;
-      const cy = height * 0.52 + mY * 16;
-
-      const rackW = Math.min(width * 0.88, 720);
-      const rackH = Math.min(height * 0.72, 340);
-      const rx = cx - rackW / 2;
-      const ry = cy - rackH / 2;
-
-      ctx.save();
-
-      // Ambient radial warm light pool behind rack
-      const glowGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, rackW * 0.7);
-      glowGrad.addColorStop(0, "rgba(212, 168, 83, 0.08)");
-      glowGrad.addColorStop(0.5, "rgba(212, 168, 83, 0.02)");
-      glowGrad.addColorStop(1, "rgba(10, 10, 14, 0)");
-      ctx.fillStyle = glowGrad;
-      ctx.fillRect(0, 0, width, height);
-
-      // Main Outer Titanium Frame
-      ctx.fillStyle = "rgba(16, 16, 20, 0.85)";
-      ctx.fillRect(rx - 8, ry - 8, rackW + 16, rackH + 16);
-
-      // Frame Specular Rim
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
-      ctx.lineWidth = 1;
-      ctx.strokeRect(rx - 8, ry - 8, rackW + 16, rackH + 16);
-
-      // Top Titanium Specular Highlight
-      const topRim = ctx.createLinearGradient(rx, ry - 8, rx + rackW, ry - 8);
-      topRim.addColorStop(0, "rgba(255, 255, 255, 0)");
-      topRim.addColorStop(0.5, "rgba(212, 168, 83, 0.7)");
-      topRim.addColorStop(1, "rgba(255, 255, 255, 0)");
-      ctx.strokeStyle = topRim;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(rx - 8, ry - 8);
-      ctx.lineTo(rx + rackW + 8, ry - 8);
-      ctx.stroke();
-
-      const bayW = rackW / cols;
-      const bayH = rackH / rows;
-
-      // Internal Bay Dividers
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.06)";
-      ctx.lineWidth = 1;
-      for (let r = 0; r <= rows; r++) {
-        const y = ry + r * bayH;
-        ctx.beginPath();
-        ctx.moveTo(rx, y);
-        ctx.lineTo(rx + rackW, y);
-        ctx.stroke();
+      ctx.clearRect(0, 0, W, H);
+      for (const d of dots) {
+        d.x += d.vx; d.y += d.vy;
+        if (d.x < 0) d.x = W; else if (d.x > W) d.x = 0;
+        if (d.y < 0) d.y = H; else if (d.y > H) d.y = 0;
       }
-      for (let c = 0; c <= cols; c++) {
-        const x = rx + c * bayW;
-        ctx.beginPath();
-        ctx.moveTo(x, ry);
-        ctx.lineTo(x, ry + rackH);
-        ctx.stroke();
-      }
-
-      // Render Individual Storage Bays
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          const idx = r * cols + c;
-          const bay = bays[idx];
-          const bx = rx + c * bayW + 4;
-          const by = ry + r * bayH + 4;
-          const bw = bayW - 8;
-          const bh = bayH - 8;
-
-          const pulse = Math.sin(t * bay.pulseSpeed + idx) * 0.1 + 0.9;
-          const fillH = bh * bay.fill;
-
-          // Bay Recessed Floor
-          ctx.fillStyle = "rgba(9, 9, 12, 0.95)";
-          ctx.fillRect(bx, by, bw, bh);
-
-          // Capacity Fill Block
-          let fillColor = `rgba(74, 186, 122, ${0.15 * pulse})`;
-          let edgeColor = "rgba(255, 255, 255, 0.08)";
-          let capLineColor = "rgba(255, 255, 255, 0.4)";
-
-          if (bay.isCrit) {
-            fillColor = `rgba(212, 90, 74, ${0.25 * pulse})`;
-            edgeColor = "rgba(212, 90, 74, 0.4)";
-            capLineColor = "#d45a4a";
-          } else if (bay.isAmber) {
-            fillColor = `rgba(212, 168, 83, ${0.2 * pulse})`;
-            edgeColor = `rgba(212, 168, 83, ${0.35 * pulse})`;
-            capLineColor = "#d4a853";
+      for (let i = 0; i < dots.length; i++) {
+        for (let j = i + 1; j < dots.length; j++) {
+          const dx = dots[i].x - dots[j].x, dy = dots[i].y - dots[j].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < LINK) {
+            const a = (1 - dist / LINK) * 0.1;
+            ctx.strokeStyle = (dots[i].amber || dots[j].amber)
+              ? `rgba(212,168,83,${a})` : `rgba(255,255,255,${a * 0.4})`;
+            ctx.lineWidth = 0.5;
+            ctx.beginPath(); ctx.moveTo(dots[i].x, dots[i].y); ctx.lineTo(dots[j].x, dots[j].y); ctx.stroke();
           }
-
-          ctx.fillStyle = fillColor;
-          ctx.fillRect(bx, by + (bh - fillH), bw, fillH);
-
-          // Bay border
-          ctx.strokeStyle = edgeColor;
-          ctx.lineWidth = 1;
-          ctx.strokeRect(bx, by, bw, bh);
-
-          // Top illumination line of the payload
-          ctx.strokeStyle = capLineColor;
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          ctx.moveTo(bx, by + (bh - fillH));
-          ctx.lineTo(bx + bw, by + (bh - fillH));
-          ctx.stroke();
-
-          // Alphanumeric Bay Coordinate Tag
-          ctx.fillStyle = bay.isCrit ? "#d45a4a" : bay.isAmber ? "#d4a853" : "rgba(255, 255, 255, 0.35)";
-          ctx.font = "8px 'JetBrains Mono', monospace";
-          ctx.textAlign = "left";
-          const rowChar = String.fromCharCode(65 + r);
-          ctx.fillText(`${rowChar}-${c + 1}`, bx + 4, by + 10);
         }
       }
-
-      // ── Laser Optical Scanner Sweep Beam ──
-      const scanProgress = (Math.sin(t * 0.8) + 1) / 2; // 0 -> 1
-      const scanX = rx + scanProgress * rackW;
-
-      const scanGrad = ctx.createLinearGradient(scanX - 25, ry, scanX + 25, ry);
-      scanGrad.addColorStop(0, "rgba(212, 168, 83, 0)");
-      scanGrad.addColorStop(0.5, "rgba(212, 168, 83, 0.3)");
-      scanGrad.addColorStop(1, "rgba(212, 168, 83, 0)");
-      ctx.fillStyle = scanGrad;
-      ctx.fillRect(scanX - 25, ry, 50, rackH);
-
-      ctx.strokeStyle = "rgba(212, 168, 83, 0.85)";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(scanX, ry - 4);
-      ctx.lineTo(scanX, ry + rackH + 4);
-      ctx.stroke();
-
-      ctx.restore();
+      for (const d of dots) {
+        ctx.beginPath(); ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+        ctx.fillStyle = d.amber ? "rgba(212,168,83,0.5)" : "rgba(255,255,255,0.15)";
+        ctx.fill();
+      }
       animId = requestAnimationFrame(render);
     };
-
     render();
+    return () => { cancelAnimationFrame(animId); window.removeEventListener("resize", resize); };
+  }, []);
 
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      mouseRef.current.targetX = ((e.clientX - rect.left) / width) * 2 - 1;
-      mouseRef.current.targetY = ((e.clientY - rect.top) / height) * 2 - 1;
-    };
+  return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }} />;
+}
 
-    window.addEventListener("mousemove", handleMouseMove);
+/* ═══════════════════════════════════════════════════════════════════════════
+   2D UI COMPONENTS
+═══════════════════════════════════════════════════════════════════════════ */
 
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener("resize", setSize);
-      window.removeEventListener("mousemove", handleMouseMove);
-    };
-  }, [velocity]);
+/** Scroll-reveal wrapper */
+function Reveal({
+  children,
+  delay = 0,
+  className = "",
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      { threshold: 0.12 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="w-full h-full pointer-events-none"
-      style={{ opacity: 0.96 }}
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? "none" : "translateY(28px)",
+        transition: `opacity 0.65s ease ${delay}ms, transform 0.65s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Animated counter */
+function AnimatedCounter({
+  target,
+  suffix = "",
+  duration = 1800,
+  started,
+}: {
+  target: number;
+  suffix?: string;
+  duration?: number;
+  started: boolean;
+}) {
+  const [value, setValue] = useState(0);
+  useEffect(() => {
+    if (!started) return;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setValue(Math.round(eased * target));
+      if (progress < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [started, target, duration]);
+  return <span>{value.toLocaleString()}{suffix}</span>;
+}
+
+/** Clean Modern Section Header */
+function SectionHeader({
+  badge,
+  title,
+  subtitle,
+}: {
+  badge?: string;
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <div className="mb-14 text-center max-w-2xl mx-auto">
+      {badge && (
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(212,168,83,0.08)] border border-[rgba(212,168,83,0.2)] mb-4">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+          <span className="text-[11px] font-medium tracking-wider uppercase text-[#d4a853]">
+            {badge}
+          </span>
+        </div>
+      )}
+      <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-[#f4f4f5]">
+        {title}
+      </h2>
+      {subtitle && (
+        <p className="mt-3 text-sm text-[#97979d] leading-relaxed">
+          {subtitle}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** Animated floating glow orb */
+function FloatingGlow({ color, size, top, left, delay = 0 }: { color: string; size: number; top: string; left: string; delay?: number }) {
+  return (
+    <div
+      className="absolute rounded-full pointer-events-none"
+      style={{
+        width: size, height: size, top, left,
+        background: `radial-gradient(circle, ${color} 0%, transparent 70%)`,
+        filter: "blur(60px)",
+        animation: `floatGlow 8s ease-in-out ${delay}s infinite alternate`,
+      }}
     />
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   APPLE-GRADE SCROLL-DRIVEN CHAPTER PROGRESS DOCK
-   ═══════════════════════════════════════════════════════════════ */
-function ChapterDock({ activeChapter }: { activeChapter: number }) {
-  const chapters = [
-    { id: 1, title: "Physical Computing" },
-    { id: 2, title: "Triple-Lock Engine" },
-    { id: 3, title: "Telemetry Simulator" },
-    { id: 4, title: "Monolithic Specs" },
-  ];
+/** Top-tier custom StockPilot brand emblem with aerodynamic pilot delta-wing and glowing gold typography */
+export function StockPilotLogo({
+  size = "md",
+  className = "",
+}: {
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}) {
+  const iconSizes = {
+    sm: "w-8 h-8",
+    md: "w-9 h-9",
+    lg: "w-11 h-11",
+  };
+
+  const textSizes = {
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-lg",
+  };
 
   return (
-    <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 hidden xl:flex flex-col gap-3 font-mono text-[10px]">
-      {chapters.map((ch) => (
-        <a
-          key={ch.id}
-          href={`#chapter-${ch.id}`}
-          className={`flex items-center gap-2.5 transition-all group ${
-            activeChapter === ch.id ? "text-[#d4a853]" : "text-[#5c5c64] hover:text-[#e8e6e3]"
-          }`}
+    <div className={`flex items-center gap-2.5 select-none group ${className}`}>
+      {/* Pilot Delta Wing Emblem */}
+      <div
+        className={`${iconSizes[size]} relative flex items-center justify-center rounded-xl transition-all duration-300 group-hover:scale-105 group-hover:border-[#d4a853]/60`}
+        style={{
+          background: "linear-gradient(135deg, rgba(30,28,34,0.9), rgba(14,14,18,0.95))",
+          border: "1px solid rgba(212,168,83,0.35)",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.5), 0 0 14px rgba(212,168,83,0.15), inset 0 1px 1px rgba(255,255,255,0.12)",
+        }}
+      >
+        <svg
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-5 h-5 transition-transform duration-300 group-hover:scale-110"
         >
-          <span
-            className={`w-1.5 h-1.5 rounded-full transition-all ${
-              activeChapter === ch.id
-                ? "bg-[#d4a853] scale-125 shadow-[0_0_8px_#d4a853]"
-                : "bg-[#303035] group-hover:bg-[#97979d]"
-            }`}
+          <defs>
+            <linearGradient id="sp-gold-grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fae099" />
+              <stop offset="60%" stopColor="#d4a853" />
+              <stop offset="100%" stopColor="#a37629" />
+            </linearGradient>
+            <linearGradient id="sp-gold-grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="30%" stopColor="#fae099" />
+              <stop offset="100%" stopColor="#d4a853" />
+            </linearGradient>
+          </defs>
+
+          {/* Left Swept Delta Wing */}
+          <path
+            d="M16 5L6 23L16 19.5L16 5Z"
+            fill="url(#sp-gold-grad1)"
+            opacity="0.88"
           />
-          <span className="tracking-wider uppercase opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            0{ch.id} {ch.title}
-          </span>
-        </a>
-      ))}
-    </div>
-  );
-}
 
-/* ═══════════════════════════════════════════════════════════════
-   SCROLLYTELLING FULFILLMENT STAGE (APPLE KEYNOTE STICKY PIN)
-   ═══════════════════════════════════════════════════════════════ */
-function ScrollytellingEngine() {
-  const [activeStage, setActiveStage] = useState(0);
+          {/* Right Swept Wing Facet */}
+          <path
+            d="M16 5L26 23L16 19.5L16 5Z"
+            fill="url(#sp-gold-grad2)"
+          />
 
-  const stages = [
-    {
-      id: "stage-01",
-      number: "01",
-      tag: "INGESTION PHASE",
-      title: "Physical Event Synchronization",
-      description:
-        "Every pallet scan, RFID portal crossing, and weigh-scale read writes to an immutable PostgreSQL 16 append-only ledger in under 18 milliseconds.",
-      metrics: [
-        { label: "Commit Latency", value: "< 18 ms" },
-        { label: "Ledger Durability", value: "ACID Guaranteed" },
-        { label: "Scanner Integration", value: "Zebra / Datalogic / API" },
-      ],
-      badge: "SUB-20MS WRITE STREAM",
-    },
-    {
-      id: "stage-02",
-      number: "02",
-      tag: "INTELLIGENCE PHASE",
-      title: "Bayesian Demand Sentinel",
-      description:
-        "Continuous Monte Carlo background workers forecast product velocity shifts, monitor supplier transit drift, and compute dynamic safety stock thresholds.",
-      metrics: [
-        { label: "Predictive Confidence", value: "99.94%" },
-        { label: "Simulation Horizon", value: "90-Day Continuous" },
-        { label: "Lead Time Drift", value: "Stochastically Adjusted" },
-      ],
-      badge: "MONTE CARLO DRIFT DEFENSE",
-    },
-    {
-      id: "stage-03",
-      number: "03",
-      tag: "DISPATCH PHASE",
-      title: "Autonomous Restock Execution",
-      description:
-        "Purchase orders are computed before safety margins breach. Consolidates supplier volume tiers, balances minimum order quantities, and routes directly to ERP.",
-      metrics: [
-        { label: "Stockout Elimination", value: "100% Guaranteed" },
-        { label: "Supplier Consolidation", value: "Auto-Tiered Pricing" },
-        { label: "Human Intervention", value: "Zero Routine Friction" },
-      ],
-      badge: "AUTOMATED REORDER DISPATCH",
-    },
-  ];
+          {/* Center Navigation Diamond Vector */}
+          <path
+            d="M16 8.5L19.2 19L16 17L12.8 19L16 8.5Z"
+            fill="#ffffff"
+            opacity="0.95"
+          />
 
-  return (
-    <div className="rounded-3xl border border-[rgba(255,255,255,0.12)] bg-[#0d0d12]/90 backdrop-blur-2xl p-6 sm:p-10 shadow-[0_30px_100px_rgba(0,0,0,0.85)]">
-      {/* Stage Selector Tabs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pb-8 border-b border-[rgba(255,255,255,0.08)]">
-        {stages.map((stage, idx) => (
-          <button
-            key={stage.id}
-            onClick={() => setActiveStage(idx)}
-            className={`p-4 rounded-2xl text-left transition-all relative overflow-hidden border ${
-              activeStage === idx
-                ? "bg-[rgba(212,168,83,0.1)] border-[#d4a853] shadow-[0_0_25px_rgba(212,168,83,0.15)]"
-                : "bg-[#14141a] border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.15)] text-[#97979d]"
-            }`}
-          >
-            <div className="flex items-center justify-between text-xs font-mono">
-              <span className={activeStage === idx ? "text-[#d4a853] font-bold" : "text-[#5c5c64]"}>
-                PHASE {stage.number}
-              </span>
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  activeStage === idx ? "bg-[#d4a853] animate-pulse" : "bg-[#303035]"
-                }`}
-              />
-            </div>
-            <h4
-              className={`mt-2 font-bold text-sm tracking-tight ${
-                activeStage === idx ? "text-[#e8e6e3]" : "text-[#97979d]"
-              }`}
-            >
-              {stage.title}
-            </h4>
-          </button>
-        ))}
+          {/* Pilot Beacon Indicator */}
+          <circle cx="16" cy="24.5" r="1.5" fill="#f5cf7b" />
+        </svg>
       </div>
 
-      {/* Active Stage Deep-Dive Showcase */}
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        <div className="lg:col-span-7">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#181822] border border-[rgba(255,255,255,0.1)] mb-4 text-[10px] font-mono text-[#d4a853]">
-            <span>{stages[activeStage].badge}</span>
-          </div>
-
-          <h3 className="text-2xl sm:text-4xl font-extrabold text-[#e8e6e3] tracking-tight">
-            {stages[activeStage].title}
-          </h3>
-
-          <p className="mt-3 text-sm text-[#97979d] leading-relaxed max-w-xl">
-            {stages[activeStage].description}
-          </p>
-
-          {/* Interactive Specification Tiles */}
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono">
-            {stages[activeStage].metrics.map((m) => (
-              <div
-                key={m.label}
-                className="p-4 rounded-xl bg-[#09090c] border border-[rgba(255,255,255,0.06)]"
-              >
-                <span className="text-[10px] uppercase text-[#5c5c64] block tracking-wider">
-                  {m.label}
-                </span>
-                <span className="text-sm font-bold text-[#e8e6e3] mt-1 block">
-                  {m.value}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 flex items-center gap-4">
-            <Link
-              to="/dashboard"
-              className="px-6 py-3 rounded-xl text-xs font-mono font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all shadow-md"
-            >
-              Open Spatial Console →
-            </Link>
-            <span className="text-xs font-mono text-[#5c5c64]">
-              Real-time synchronization active
-            </span>
-          </div>
-        </div>
-
-        {/* Live Visual Graphic Box */}
-        <div className="lg:col-span-5 h-[260px] sm:h-[300px] relative rounded-2xl overflow-hidden border border-[rgba(255,255,255,0.08)] bg-[#07070a]">
-          <AppleSpatialWarehouseCanvas velocity={activeStage === 1 ? 1.8 : activeStage === 2 ? 0.6 : 1.2} />
-          <div className="absolute bottom-3 right-3 px-2.5 py-1 rounded bg-[#0e0e14]/85 border border-[rgba(255,255,255,0.1)] text-[9px] font-mono text-[#d4a853]">
-            TELEMETRY NODE ACTIVE // PHASE {stages[activeStage].number}
-          </div>
-        </div>
+      {/* Modern Wordmark */}
+      <div className="flex items-center">
+        <span className={`${textSizes[size]} font-bold tracking-[0.2em] text-[#f4f4f5]`}>
+          STOCK
+        </span>
+        <span
+          className={`${textSizes[size]} font-black tracking-[0.2em] ml-0.5`}
+          style={{
+            background: "linear-gradient(135deg, #fce8b3 0%, #d4a853 60%, #b3852b 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          PILOT
+        </span>
       </div>
     </div>
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   INTERACTIVE REORDER & SAFETY BUFFER CALCULATOR
-   Visitors can scrub real numbers to see dynamic replenishment
-   ═══════════════════════════════════════════════════════════════ */
-function InteractiveBufferCalculator() {
-  const [dailySales, setDailySales] = useState(120);
-  const [leadTimeDays, setLeadTimeDays] = useState(7);
-  const [serviceLevel, setServiceLevel] = useState(99);
-
-  // Dynamic calculations:
-  // Safety Stock = Z * stdDev * sqrt(leadTime)
-  // Reorder Point = (Daily Sales * Lead Time) + Safety Stock
-  const zScore = serviceLevel === 99 ? 2.33 : serviceLevel === 95 ? 1.65 : 1.28;
-  const stdDevDaily = Math.max(1, Math.round(dailySales * 0.25));
-  const safetyStock = Math.round(zScore * stdDevDaily * Math.sqrt(leadTimeDays));
-  const reorderPoint = dailySales * leadTimeDays + safetyStock;
-  const bufferDays = (safetyStock / Math.max(1, dailySales)).toFixed(1);
-
-  return (
-    <div className="rounded-3xl border border-[rgba(255,255,255,0.12)] bg-[#101015]/95 backdrop-blur-2xl p-6 sm:p-10 shadow-[0_30px_90px_rgba(0,0,0,0.85)]">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-[rgba(255,255,255,0.08)]">
-        <div>
-          <span className="text-[10px] font-mono text-[#d4a853] uppercase tracking-widest block">
-            INTERACTIVE REORDER SIMULATOR
-          </span>
-          <h3 className="text-xl sm:text-2xl font-bold text-[#e8e6e3] mt-0.5 tracking-tight">
-            Bayesian Safety Threshold Calculator
-          </h3>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {[90, 95, 99].map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => setServiceLevel(lvl)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all ${
-                serviceLevel === lvl
-                  ? "bg-[#d4a853] text-[#0c0c0e] font-bold"
-                  : "bg-[#181822] text-[#97979d] hover:text-[#e8e6e3] border border-[rgba(255,255,255,0.06)]"
-              }`}
-            >
-              {lvl}% Confidence
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        {/* Controls Column */}
-        <div className="lg:col-span-6 space-y-6">
-          {/* Daily Sales Slider */}
-          <div>
-            <div className="flex justify-between items-center text-xs font-mono mb-2">
-              <span className="text-[#97979d] uppercase">Daily Sales Run-Rate</span>
-              <span className="text-[#e8e6e3] font-bold text-sm tabular-nums">
-                {dailySales.toLocaleString()} units / day
-              </span>
-            </div>
-            <input
-              type="range"
-              min={20}
-              max={600}
-              step={10}
-              value={dailySales}
-              onChange={(e) => setDailySales(Number(e.target.value))}
-              className="w-full h-1.5 bg-[#202028] rounded-lg appearance-none cursor-pointer accent-[#d4a853]"
-            />
-            <div className="flex justify-between text-[10px] font-mono text-[#5c5c64] mt-1">
-              <span>20 / day</span>
-              <span>600 / day</span>
-            </div>
-          </div>
-
-          {/* Supplier Lead Time Slider */}
-          <div>
-            <div className="flex justify-between items-center text-xs font-mono mb-2">
-              <span className="text-[#97979d] uppercase">Supplier Lead Time</span>
-              <span className="text-[#d4a853] font-bold text-sm tabular-nums">
-                {leadTimeDays} Days
-              </span>
-            </div>
-            <input
-              type="range"
-              min={2}
-              max={30}
-              step={1}
-              value={leadTimeDays}
-              onChange={(e) => setLeadTimeDays(Number(e.target.value))}
-              className="w-full h-1.5 bg-[#202028] rounded-lg appearance-none cursor-pointer accent-[#d4a853]"
-            />
-            <div className="flex justify-between text-[10px] font-mono text-[#5c5c64] mt-1">
-              <span>2 Days (Air Freight)</span>
-              <span>30 Days (Ocean Vessel)</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Dynamic Computed Telemetry Output */}
-        <div className="lg:col-span-6 grid grid-cols-2 gap-4 font-mono">
-          <div className="p-5 rounded-2xl bg-[#0a0a0e] border border-[rgba(255,255,255,0.08)]">
-            <span className="text-[10px] text-[#5c5c64] uppercase block">REORDER TRIGGER POINT</span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-[#e8e6e3] mt-1 block tabular-nums">
-              {reorderPoint.toLocaleString()}
-            </span>
-            <span className="text-[10px] text-[#97979d] mt-1 block">Units in physical storage</span>
-          </div>
-
-          <div className="p-5 rounded-2xl bg-[#0a0a0e] border border-[rgba(255,255,255,0.08)]">
-            <span className="text-[10px] text-[#5c5c64] uppercase block">CALCULATED SAFETY BUFFER</span>
-            <span className="text-2xl sm:text-3xl font-extrabold text-[#d4a853] mt-1 block tabular-nums">
-              +{safetyStock.toLocaleString()}
-            </span>
-            <span className="text-[10px] text-[#97979d] mt-1 block">{bufferDays} buffer days</span>
-          </div>
-
-          <div className="p-4 rounded-xl bg-[#14141c] border border-[rgba(255,255,255,0.06)] col-span-2 flex items-center justify-between text-xs">
-            <span className="text-[#97979d]">Automated Purchase Order Protocol:</span>
-            <span className="text-[#4aba7a] font-bold flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-[#4aba7a] animate-pulse" />
-              Active // Zero Stockout Risk
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   MAIN REDESIGNED LANDING PAGE (APPLE PRODUCT KEYNOTE STYLE)
-   ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN LANDING PAGE
+═══════════════════════════════════════════════════════════════════════════ */
 export default function LandingPage() {
-  const [activeChapter, setActiveChapter] = useState(1);
+  const [heroVisible, setHeroVisible] = useState(false);
+  const [statsVisible, setStatsVisible] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [consoleTab, setConsoleTab] = useState(0);
+  const statsRef = useRef<HTMLDivElement>(null);
 
-  // Smooth scroll tracker for Chapter Dock
-  const handleScroll = useCallback(() => {
-    const scrollY = window.scrollY;
-    const windowH = window.innerHeight;
-    const chapter = Math.min(4, Math.max(1, Math.floor(scrollY / (windowH * 0.85)) + 1));
-    setActiveChapter(chapter);
+  useEffect(() => {
+    const t = setTimeout(() => setHeroVisible(true), 120);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
+    const el = statsRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const handleMove = (e: MouseEvent) => {
+      setMousePos({
+        x: (e.clientX / window.innerWidth) * 2 - 1,
+        y: (e.clientY / window.innerHeight) * 2 - 1,
+      });
+    };
+    window.addEventListener("mousemove", handleMove);
+    return () => window.removeEventListener("mousemove", handleMove);
+  }, []);
+
+  const features = [
+    {
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+        </svg>
+      ),
+      title: "Predictive Demand Engine",
+      desc: "Machine learning models forecast demand shifts up to 90 days out, ingesting seasonality, promotions, and SKU velocities.",
+    },
+    {
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      title: "Automated Anomaly Alerts",
+      desc: "Catch sudden spikes in demand, supplier bottlenecks, and inventory drift before stockouts impact revenue.",
+    },
+    {
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M4 7h16" />
+        </svg>
+      ),
+      title: "Dead Stock Elimination",
+      desc: "Identify slow-moving inventory before holding costs accumulate, and generate smart markdown and liquidation strategies.",
+    },
+    {
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      title: "Supplier Insight & Lead Times",
+      desc: "Monitor vendor reliability, lead-time variance, and automatically buffer purchase orders to prevent stockout gaps.",
+    },
+    {
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      ),
+      title: "Natural Language AI Copilot",
+      desc: "Ask inventory questions in plain English: 'Which SKUs will sell out this month?', 'What should I restock today?', or simulate promotions.",
+    },
+    {
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+      title: "What-If Restock Simulator",
+      desc: "Stress-test supply disruptions, tariff changes, and volume shifts before committing working capital to purchase orders.",
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#070709] text-[#e8e6e3] overflow-x-hidden select-none font-sans">
-      {/* ─── FIXED ULTRA-THIN SPECULAR HEADER ─── */}
+    <div className="min-h-screen w-full relative overflow-x-hidden" style={{ background: "#0a0a0c" }}>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          NAVBAR — Full-Featured Modern SaaS Header
+      ════════════════════════════════════════════════════════════════════ */}
       <header
-        className="fixed top-0 inset-x-0 h-16 z-50 flex items-center justify-between px-6 md:px-12 transition-all duration-300"
+        className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12 h-16"
         style={{
-          background: "rgba(8, 8, 10, 0.75)",
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
+          background: "rgba(10,10,12,0.75)",
+          backdropFilter: "blur(20px)",
+          borderBottom: "1px solid rgba(255,255,255,0.06)",
         }}
       >
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="text-base font-bold tracking-widest text-[#e8e6e3]">STOCK</span>
-          <span className="text-base font-bold tracking-widest text-[#d4a853]">PILOT</span>
-          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#d4a853]/15 text-[#d4a853] border border-[#d4a853]/25">
-            PRO
-          </span>
+        {/* Brand Logo */}
+        <Link to="/" className="select-none">
+          <StockPilotLogo size="sm" />
         </Link>
 
-        {/* Minimal Nav Links */}
-        <nav className="hidden md:flex items-center gap-8 text-xs font-mono text-[#97979d]">
-          <a href="#chapter-1" className="hover:text-[#e8e6e3] transition-colors">
-            OVERVIEW
+        {/* Navigation Page Links */}
+        <nav className="hidden md:flex items-center gap-8 text-xs font-medium text-[#97979d]">
+          <a href="#features" className="hover:text-[#e8e6e3] transition-colors">
+            Features
           </a>
-          <a href="#chapter-2" className="hover:text-[#e8e6e3] transition-colors">
-            TRIPLE-LOCK
+          <a href="#dashboard" className="hover:text-[#e8e6e3] transition-colors">
+            Dashboard
           </a>
-          <a href="#chapter-3" className="hover:text-[#e8e6e3] transition-colors">
-            SIMULATOR
+          <a href="#how-it-works" className="hover:text-[#e8e6e3] transition-colors">
+            How It Works
           </a>
-          <a href="#chapter-4" className="hover:text-[#e8e6e3] transition-colors">
-            SPECIFICATIONS
+          <a href="#pricing" className="hover:text-[#e8e6e3] transition-colors">
+            Pricing
           </a>
         </nav>
 
-        {/* Right CTA */}
+        {/* Action Buttons */}
         <div className="flex items-center gap-3">
           <Link
             to="/login"
-            className="px-4 py-2 rounded-lg text-xs font-mono font-medium text-[#97979d] hover:text-[#e8e6e3] transition-colors"
+            id="nav-login-btn"
+            className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#97979d] hover:text-[#e8e6e3] transition-colors"
           >
-            Sign In
+            Sign in
           </Link>
           <Link
-            to="/dashboard"
-            className="px-4 py-2 rounded-lg text-xs font-mono font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all shadow-[0_0_20px_rgba(212,168,83,0.3)]"
+            to="/register"
+            id="nav-register-btn"
+            className="px-4 py-2 rounded-lg text-xs font-semibold text-[#0c0c0e] transition-all hover:scale-[1.03] active:scale-100"
+            style={{
+              background: "linear-gradient(135deg, #d4a853, #f5cf7b)",
+              boxShadow: "0 0 20px rgba(212,168,83,0.25)",
+            }}
           >
-            Launch Console →
+            Get Started
           </Link>
         </div>
       </header>
 
-      {/* Chapter Indicator Dock */}
-      <ChapterDock activeChapter={activeChapter} />
+      {/* ════════════════════════════════════════════════════════════════════
+          HERO — Unrestricted 3D Viewport + Clean, High-Converting Hero
+      ════════════════════════════════════════════════════════════════════ */}
+      <section className="relative w-full min-h-screen overflow-hidden flex flex-col justify-center">
+        {/* 3D Canvas — unblocked, fills entire viewport */}
+        <div className="absolute inset-0 z-0 pointer-events-auto">
+          <Canvas
+            shadows
+            dpr={[1, 1.5]}
+            gl={{
+              antialias: true,
+              alpha: true,
+              powerPreference: "high-performance",
+              toneMapping: THREE.ACESFilmicToneMapping,
+              toneMappingExposure: 1.2,
+            }}
+            camera={{ position: [0, 2.2, 6], fov: 45, near: 0.1, far: 60 }}
+            style={{ background: "#0a0a0c" }}
+          >
+            <Suspense fallback={null}>
+              <HeroScene mouseX={mousePos.x} mouseY={mousePos.y} />
+            </Suspense>
+          </Canvas>
+        </div>
 
-      {/* ═══════════════════════════════════════════════════════
-          CHAPTER 1: THE HERO STATEMENT (APPLE-STYLE TITANIUM)
-          ═══════════════════════════════════════════════════════ */}
-      <section
-        id="chapter-1"
-        className="relative pt-36 pb-24 px-6 md:px-12 flex flex-col items-center text-center overflow-hidden"
-      >
-        {/* Subtle Ambient Radial Lighting */}
+        {/* Ambient atmospheric gradients — ensures text contrast while preserving 3D visibility */}
         <div
-          className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[350px] rounded-full blur-[150px] pointer-events-none"
-          style={{ background: "radial-gradient(circle, rgba(212,168,83,0.12) 0%, transparent 70%)" }}
+          className="absolute inset-0 z-[1] pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(10,10,12,0.88) 0%, rgba(10,10,12,0.6) 45%, rgba(10,10,12,0.2) 75%, rgba(10,10,12,0.5) 100%), linear-gradient(180deg, rgba(10,10,12,0.5) 0%, transparent 40%, rgba(10,10,12,0.95) 100%)",
+          }}
         />
 
-        {/* Small Authoritative Kicker (Satisfies test match) */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#14141b] border border-[rgba(255,255,255,0.1)] mb-8">
-          <span className="w-2 h-2 rounded-full bg-[#4aba7a] animate-pulse" />
-          <span className="text-[11px] font-mono text-[#97979d] tracking-widest uppercase">
-            STOCKPILOT PRO // PHYSICAL INVENTORY COMPUTING
-          </span>
-        </div>
-
-        {/* Giant Apple-Style Titanium Headline */}
-        <h1 className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold tracking-tight leading-[1.02] max-w-6xl">
-          The physics of inventory.{" "}
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#d4a853] via-[#f5d48c] to-[#d4a853]">
-            Mastered.
-          </span>
-        </h1>
-
-        <p className="mt-6 text-lg sm:text-2xl text-[#97979d] max-w-3xl font-normal leading-relaxed">
-          The spatial operating system for high-velocity physical fulfillment. Sub-18ms ledger transactions. Zero stockout tolerance. Continuous Bayesian restocking.
-        </p>
-
-        {/* Hero CTAs */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-          <Link
-            to="/register"
-            className="px-8 py-4 rounded-xl text-sm font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all shadow-[0_0_35px_rgba(212,168,83,0.35)]"
+        {/* Hero Content — Clean & Elegant */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-6 md:px-12 pt-28 pb-16 pointer-events-none">
+          <div
+            className="max-w-2xl text-left pointer-events-auto transition-all duration-700"
+            style={{
+              opacity: heroVisible ? 1 : 0,
+              transform: heroVisible ? "translateY(0)" : "translateY(24px)",
+            }}
           >
-            Deploy StockPilot Free →
-          </Link>
-          <a
-            href="#chapter-2"
-            className="px-8 py-4 rounded-xl text-sm font-medium text-[#e8e6e3] bg-[#14141a] hover:bg-[#1e1e26] border border-[rgba(255,255,255,0.12)] transition-all"
-          >
-            Explore Engine Stages ↓
-          </a>
-        </div>
-
-        {/* Interactive Warehouse Stage Canvas Visual */}
-        <div className="mt-16 w-full max-w-5xl h-[380px] sm:h-[460px] relative rounded-3xl overflow-hidden border border-[rgba(255,255,255,0.1)] bg-[#0a0a0e] shadow-[0_30px_100px_rgba(0,0,0,0.95)]">
-          <AppleSpatialWarehouseCanvas />
-
-          <div className="absolute bottom-5 inset-x-0 flex items-center justify-center gap-2 text-[10px] font-mono text-[#5c5c64] uppercase tracking-wider">
-            <span>Tilt cursor across stage to rotate perspective & examine bay occupancy</span>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════
-          CHAPTER 2: TRIPLE-LOCK ENGINE (APPLE SCROLLYTELLING)
-          ═══════════════════════════════════════════════════════ */}
-      <section id="chapter-2" className="py-28 px-6 md:px-12 max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="text-xs font-mono text-[#d4a853] uppercase tracking-widest">
-            ENGINEERING CADENCE
-          </span>
-          <h2 className="text-4xl sm:text-6xl font-extrabold text-[#e8e6e3] tracking-tight mt-2">
-            The Triple-Lock Fulfillment Engine.
-          </h2>
-          <p className="mt-4 text-base text-[#97979d] leading-relaxed">
-            Eliminate human error and phantom stockouts. Continuous algorithmic coordination across your physical bays.
-          </p>
-        </div>
-
-        <ScrollytellingEngine />
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════
-          CHAPTER 3: INTERACTIVE REORDER SIMULATOR
-          ═══════════════════════════════════════════════════════ */}
-      <section id="chapter-3" className="py-28 px-6 md:px-12 max-w-7xl mx-auto">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <span className="text-xs font-mono text-[#d4a853] uppercase tracking-widest">
-            TACTILE PRECISION
-          </span>
-          <h2 className="text-4xl sm:text-6xl font-extrabold text-[#e8e6e3] tracking-tight mt-2">
-            Experience the mathematics.
-          </h2>
-          <p className="mt-4 text-base text-[#97979d] leading-relaxed">
-            Drag the parameters below to witness StockPilot dynamically compute reorder trigger thresholds and safety stock in real-time.
-          </p>
-        </div>
-
-        <InteractiveBufferCalculator />
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════
-          CHAPTER 4: APPLE MONOLITHIC METRICS (BIG NUMBERS)
-          ═══════════════════════════════════════════════════════ */}
-      <section id="chapter-4" className="py-28 px-6 md:px-12 border-y border-[rgba(255,255,255,0.06)] bg-[#0a0a0d]">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16">
-            <span className="text-xs font-mono text-[#d4a853] uppercase tracking-widest">
-              PROVEN TELEMETRY
-            </span>
-            <h2 className="text-3xl sm:text-5xl font-extrabold text-[#e8e6e3] tracking-tight mt-2">
-              Performance by the numbers.
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-8 rounded-2xl bg-[#121216] border border-[rgba(255,255,255,0.08)] flex flex-col justify-between">
-              <span className="text-4xl sm:text-6xl font-bold font-mono text-[#e8e6e3] tabular-nums tracking-tight">
-                &lt;18<span className="text-[#d4a853] text-2xl">ms</span>
+            {/* Pill Badge */}
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(212,168,83,0.08)] border border-[rgba(212,168,83,0.25)] mb-6 backdrop-blur-md">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853] animate-pulse" />
+              <span className="text-xs font-medium text-[#d4a853]">
+                Autonomous Inventory Intelligence
               </span>
-              <div className="mt-8">
-                <h4 className="text-sm font-semibold text-[#e8e6e3]">Ledger Latency</h4>
-                <p className="text-xs text-[#97979d] mt-1">PostgreSQL 16 distributed transactions sync in real time.</p>
-              </div>
             </div>
 
-            <div className="p-8 rounded-2xl bg-[#121216] border border-[rgba(255,255,255,0.08)] flex flex-col justify-between">
-              <span className="text-4xl sm:text-6xl font-bold font-mono text-[#d4a853] tabular-nums tracking-tight">
-                99.94<span className="text-2xl">%</span>
+            {/* Main Headline */}
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.08] text-[#f4f4f5]">
+              Predict demand.<br />
+              Prevent stockouts.<br />
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #d4a853 0%, #f7dc99 50%, #d4a853 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                }}
+              >
+                Eliminate dead stock.
               </span>
-              <div className="mt-8">
-                <h4 className="text-sm font-semibold text-[#e8e6e3]">Forecast Accuracy</h4>
-                <p className="text-xs text-[#97979d] mt-1">Bayesian seasonal velocity models eliminate guessing.</p>
-              </div>
-            </div>
+            </h1>
 
-            <div className="p-8 rounded-2xl bg-[#121216] border border-[rgba(255,255,255,0.08)] flex flex-col justify-between">
-              <span className="text-4xl sm:text-6xl font-bold font-mono text-[#e8e6e3] tabular-nums tracking-tight">
-                $42.8<span className="text-[#d4a853] text-2xl">M</span>
-              </span>
-              <div className="mt-8">
-                <h4 className="text-sm font-semibold text-[#e8e6e3]">Monitored Assets</h4>
-                <p className="text-xs text-[#97979d] mt-1">Under continuous real-time sentinel surveillance.</p>
-              </div>
-            </div>
-
-            <div className="p-8 rounded-2xl bg-[#121216] border border-[rgba(255,255,255,0.08)] flex flex-col justify-between">
-              <span className="text-4xl sm:text-6xl font-bold font-mono text-[#4aba7a] tabular-nums tracking-tight">
-                0
-              </span>
-              <div className="mt-8">
-                <h4 className="text-sm font-semibold text-[#e8e6e3]">Preventable Stockouts</h4>
-                <p className="text-xs text-[#97979d] mt-1">Automated purchase orders dispatch before safety margins breach.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════
-          CHAPTER 5: APPLE-GRADE FINAL CALLOUT
-          ═══════════════════════════════════════════════════════ */}
-      <section className="py-28 px-6 md:px-12 text-center relative overflow-hidden">
-        <div className="max-w-4xl mx-auto rounded-3xl bg-gradient-to-b from-[#181822] to-[#0e0e14] border border-[rgba(212,168,83,0.3)] p-10 sm:p-16 shadow-[0_30px_100px_rgba(0,0,0,0.9),0_0_50px_rgba(212,168,83,0.12)]">
-          <span className="px-3 py-1 rounded-full text-xs font-mono text-[#d4a853] bg-[#d4a853]/10 border border-[#d4a853]/30 inline-block mb-4">
-            ZERO DISRUPTION DEPLOYMENT
-          </span>
-
-          <h2 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-[#e8e6e3]">
-            Upgrade your warehouse operating system.
-          </h2>
-
-          <p className="mt-4 text-base sm:text-lg text-[#97979d] max-w-xl mx-auto leading-relaxed">
-            Connect StockPilot to your physical barcode scanners and ERP in under 30 minutes.
-          </p>
-
-          <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
-            <Link
-              to="/register"
-              className="px-8 py-4 rounded-xl text-sm font-semibold text-[#0c0c0e] bg-[#d4a853] hover:bg-[#e8be66] active:scale-95 transition-all shadow-[0_0_35px_rgba(212,168,83,0.35)]"
-            >
-              Get Started Free →
-            </Link>
-            <Link
-              to="/dashboard"
-              className="px-8 py-4 rounded-xl text-sm font-medium text-[#e8e6e3] bg-[#202028] hover:bg-[#282834] border border-[rgba(255,255,255,0.12)] transition-all"
-            >
-              Enter Digital Twin Console
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════════════════════════════════════
-          ARCHITECTURAL FOOTER (ONLY ON PUBLIC LANDING PAGE)
-          ═══════════════════════════════════════════════════════ */}
-      <footer className="pt-16 pb-12 px-6 md:px-12 border-t border-[rgba(255,255,255,0.08)] bg-[#050507]">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-10">
-          <div className="lg:col-span-2">
-            <Link to="/" className="flex items-center gap-2">
-              <span className="text-lg font-bold tracking-wider text-[#e8e6e3]">
-                STOCK<span className="text-[#d4a853]">PILOT</span>
-              </span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#d4a853]/15 text-[#d4a853] border border-[#d4a853]/25">
-                v2.4.1
-              </span>
-            </Link>
-            <p className="mt-3 text-xs text-[#97979d] max-w-sm leading-relaxed">
-              The spatial operating system for warehouse operations. Bridging physical logistics with real-time digital twins and predictive replenishment.
+            {/* Subtitle */}
+            <p className="mt-5 text-base md:text-lg text-[#a1a1aa] leading-relaxed">
+              AI-driven demand forecasts, anomaly detection, and automated restock planning — unified into one high-performance operating system.
             </p>
 
-            <div className="mt-6 flex items-center gap-2 text-xs font-mono text-[#97979d]">
-              <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
-              <span className="text-[#e8e6e3] font-medium">All Systems Operational</span>
-              <span className="text-[#5c5c64]">•</span>
-              <span className="text-[#5c5c64]">Global Mesh 18ms</span>
+            {/* CTA Buttons */}
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <Link
+                to="/register"
+                id="hero-register-btn"
+                className="px-8 py-3.5 rounded-xl text-sm font-semibold text-[#0c0c0e] transition-all hover:scale-[1.04] active:scale-100 flex items-center gap-2 shadow-[0_0_30px_rgba(212,168,83,0.35)]"
+                style={{ background: "linear-gradient(135deg, #d4a853, #f5cf7b)" }}
+              >
+                <span>Start Free Trial</span>
+                <span className="text-base">→</span>
+              </Link>
+              <a
+                href="#dashboard"
+                id="hero-demo-btn"
+                className="px-6 py-3.5 rounded-xl text-sm font-medium text-[#e8e6e3] hover:bg-white/5 transition-all border border-white/10 backdrop-blur-md"
+              >
+                View Dashboard Preview
+              </a>
+            </div>
+
+            {/* Simple Trust Micro-Copy */}
+            <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-[#71717a]">
+              <span>✓ No credit card required</span>
+              <span>•</span>
+              <span>✓ 14-day free trial</span>
+              <span>•</span>
+              <span>✓ Quick CSV & API import</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          REMAINING SECTIONS WRAPPER — with particle background
+      ════════════════════════════════════════════════════════════════════ */}
+      <div className="relative">
+        {/* Animated particle background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <BackgroundParticles />
+          <FloatingGlow color="rgba(212,168,83,0.05)" size={500} top="5%" left="20%" delay={0} />
+          <FloatingGlow color="rgba(107,140,199,0.04)" size={400} top="25%" left="70%" delay={2} />
+          <FloatingGlow color="rgba(212,168,83,0.04)" size={350} top="50%" left="10%" delay={4} />
+          <FloatingGlow color="rgba(74,186,122,0.03)" size={300} top="70%" left="60%" delay={1} />
+          <FloatingGlow color="rgba(212,168,83,0.05)" size={450} top="90%" left="40%" delay={3} />
+        </div>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            STATS / METRICS
+        ════════════════════════════════════════════════════════════════════ */}
+        <section ref={statsRef} className="relative z-10 py-20 px-6 md:px-12">
+          <div className="max-w-6xl mx-auto">
+            <div
+              className="h-px mb-14"
+              style={{
+                background: "linear-gradient(90deg, transparent, rgba(212,168,83,0.25), transparent)",
+                opacity: statsVisible ? 1 : 0,
+                transition: "opacity 0.6s ease",
+              }}
+            />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              {[
+                { label: "SKUs Monitored", target: 250000, suffix: "+" },
+                { label: "Forecast Accuracy", target: 99, suffix: "%", dur: 1200 },
+                { label: "Stockouts Prevented", target: 12400, suffix: "+" },
+                { label: "Lead-Time Saved", target: 3, suffix: " Days", dur: 1000 },
+              ].map((s, i) => (
+                <Reveal key={s.label} delay={i * 90}>
+                  <div
+                    className="p-6 rounded-2xl flex flex-col items-center text-center transition-all duration-300 hover:border-[#d4a853]/30"
+                    style={{
+                      background: "rgba(14,14,18,0.7)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      backdropFilter: "blur(16px)",
+                    }}
+                  >
+                    <div
+                      className="text-3xl md:text-4xl font-bold tracking-tight my-2 tabular-nums"
+                      style={{
+                        background: "linear-gradient(135deg, #f4f4f5 0%, #d4a853 100%)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                      }}
+                    >
+                      <AnimatedCounter target={s.target} suffix={s.suffix} duration={s.dur ?? 1800} started={statsVisible} />
+                    </div>
+
+                    <p className="text-xs font-medium text-[#97979d]">
+                      {s.label}
+                    </p>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+            <div
+              className="h-px mt-14"
+              style={{
+                background: "linear-gradient(90deg, transparent, rgba(212,168,83,0.25), transparent)",
+                opacity: statsVisible ? 1 : 0,
+                transition: "opacity 0.6s ease 300ms",
+              }}
+            />
+          </div>
+        </section>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            FEATURES GRID
+        ════════════════════════════════════════════════════════════════════ */}
+        <section id="features" className="relative z-10 py-20 px-6 md:px-12">
+          <div className="max-w-6xl mx-auto">
+            <Reveal>
+              <SectionHeader
+                badge="Platform Capabilities"
+                title="Everything you need to master your inventory"
+                subtitle="Eliminate spreadsheets and guesswork with high-precision forecasting and automated intelligence."
+              />
+            </Reveal>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {features.map((f, i) => (
+                <Reveal key={f.title} delay={i * 70}>
+                  <div
+                    className="p-6 rounded-2xl flex flex-col justify-between h-full transition-all duration-300 hover:border-[#d4a853]/40 hover:-translate-y-1 group"
+                    style={{
+                      background: "rgba(14,14,18,0.65)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      backdropFilter: "blur(16px)",
+                    }}
+                  >
+                    <div>
+                      <div
+                        className="w-11 h-11 rounded-xl flex items-center justify-center text-[#d4a853] mb-5 transition-transform group-hover:scale-110"
+                        style={{
+                          background: "rgba(212,168,83,0.1)",
+                          border: "1px solid rgba(212,168,83,0.25)",
+                        }}
+                      >
+                        {f.icon}
+                      </div>
+
+                      <h3 className="text-base font-bold text-[#f4f4f5] tracking-tight mb-2 group-hover:text-[#f7dc99] transition-colors">
+                        {f.title}
+                      </h3>
+                      <p className="text-xs text-[#97979d] leading-relaxed">
+                        {f.desc}
+                      </p>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            INTERACTIVE DASHBOARD PREVIEW — Expanded Height Cockpit
+        ════════════════════════════════════════════════════════════════════ */}
+        <section id="dashboard" className="relative z-10 py-24 px-6 md:px-12">
+          <div className="max-w-6xl mx-auto">
+            <Reveal>
+              <SectionHeader
+                badge="Cockpit Preview"
+                title="Real-time visibility and automated decision control"
+                subtitle="A unified command center tracking machine-learning demand curves, active restock queues, and catalog health."
+              />
+            </Reveal>
+
+            <Reveal delay={80}>
+              <div
+                className="rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.8)] border border-white/10"
+                style={{
+                  background: "rgba(12,12,16,0.92)",
+                  backdropFilter: "blur(24px)",
+                }}
+              >
+                {/* Window Header */}
+                <div
+                  className="flex flex-wrap items-center justify-between px-6 py-4 gap-4"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(18,18,24,0.6)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-3 h-3 rounded-full bg-[#d45a4a]/80 inline-block" />
+                      <span className="w-3 h-3 rounded-full bg-[#d4a853]/80 inline-block" />
+                      <span className="w-3 h-3 rounded-full bg-[#4aba7a]/80 inline-block" />
+                    </div>
+                    <div className="h-4 w-px bg-white/10 mx-1" />
+                    <span className="text-xs font-semibold text-[#f4f4f5] tracking-wide">
+                      StockPilot Cockpit
+                    </span>
+                    <span className="text-xs text-[#71717a] hidden sm:inline">
+                      / North America Central Hub
+                    </span>
+                  </div>
+
+                  {/* Right side status & time controls */}
+                  <div className="flex items-center gap-3">
+                    <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-md bg-[rgba(74,186,122,0.1)] border border-[rgba(74,186,122,0.25)] text-[11px] text-[#4aba7a]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#4aba7a] animate-pulse" />
+                      <span>Live Sync Active</span>
+                    </div>
+
+                    {/* Interactive Tabs */}
+                    <div className="flex items-center gap-1 p-1 rounded-lg bg-[rgba(24,24,32,0.8)] border border-white/5">
+                      {[
+                        { id: 0, label: "Demand Forecast" },
+                        { id: 1, label: "Restock Queue" },
+                        { id: 2, label: "Dead Stock Sentinel" },
+                      ].map((tab) => (
+                        <button
+                          key={tab.id}
+                          onClick={() => setConsoleTab(tab.id)}
+                          className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                            consoleTab === tab.id
+                              ? "bg-[#d4a853]/20 text-[#f5cf7b] border border-[#d4a853]/30 shadow-sm"
+                              : "text-[#71717a] hover:text-[#e8e6e3]"
+                          }`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4-Column Top KPI Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/5">
+                  {/* KPI 1 */}
+                  <div className="p-5 bg-[#0e0e14] flex flex-col justify-between">
+                    <div>
+                      <div className="text-[11px] text-[#71717a] uppercase tracking-wider font-semibold">
+                        30-Day Revenue Forecast
+                      </div>
+                      <div className="text-2xl font-bold text-[#f4f4f5] mt-1 tabular-nums">
+                        $284,920
+                      </div>
+                      <div className="mt-1 text-xs text-[#4aba7a] flex items-center gap-1 font-medium">
+                        <span>↑ 14.8%</span>
+                        <span className="text-[#71717a]">vs. previous cycle</span>
+                      </div>
+                    </div>
+                    <svg className="mt-3 w-full h-9" viewBox="0 0 160 36">
+                      <defs>
+                        <linearGradient id="kpi-grad-1" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#d4a853" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#d4a853" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <polygon fill="url(#kpi-grad-1)" points="0,32 20,26 40,28 60,18 80,22 100,12 120,16 140,8 160,4 160,36 0,36" />
+                      <polyline fill="none" stroke="#d4a853" strokeWidth="2" strokeLinecap="round" points="0,32 20,26 40,28 60,18 80,22 100,12 120,16 140,8 160,4" />
+                    </svg>
+                  </div>
+
+                  {/* KPI 2 */}
+                  <div className="p-5 bg-[#0e0e14] flex flex-col justify-between">
+                    <div>
+                      <div className="text-[11px] text-[#71717a] uppercase tracking-wider font-semibold">
+                        Urgent Restock Triggers
+                      </div>
+                      <div className="text-2xl font-bold text-[#f5cf7b] mt-1 tabular-nums">
+                        3 SKUs At Risk
+                      </div>
+                      <div className="mt-1 text-xs text-[#d45a4a] flex items-center gap-1 font-medium">
+                        <span>● Critical: &lt;48h buffer</span>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-end gap-1.5 h-9">
+                      {[35, 20, 58, 28, 70, 24, 46, 32, 54, 85].map((h, i) => (
+                        <div
+                          key={i}
+                          className="flex-1 rounded-t-sm transition-all"
+                          style={{
+                            height: `${h * 0.4}px`,
+                            background: i === 4 || i === 9 ? "#d45a4a" : i % 2 === 0 ? "rgba(212,168,83,0.6)" : "rgba(255,255,255,0.1)",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* KPI 3 */}
+                  <div className="p-5 bg-[#0e0e14] flex flex-col justify-between">
+                    <div>
+                      <div className="text-[11px] text-[#71717a] uppercase tracking-wider font-semibold">
+                        Turnover Velocity
+                      </div>
+                      <div className="text-2xl font-bold text-[#f4f4f5] mt-1 tabular-nums">
+                        6.8x / year
+                      </div>
+                      <div className="mt-1 text-xs text-[#4aba7a] font-medium">
+                        +38% vs. industry standard
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <div className="flex justify-between text-[10px] text-[#71717a] mb-1">
+                        <span>Efficiency Target</span>
+                        <span className="text-[#f5cf7b]">85%</span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-[#1b1b24] overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-[#d4a853] to-[#f5cf7b]"
+                          style={{ width: "85%" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* KPI 4 */}
+                  <div className="p-5 bg-[#0e0e14] flex flex-col justify-between">
+                    <div>
+                      <div className="text-[11px] text-[#71717a] uppercase tracking-wider font-semibold">
+                        Trapped Capital Recovered
+                      </div>
+                      <div className="text-2xl font-bold text-[#4aba7a] mt-1 tabular-nums">
+                        $64,300
+                      </div>
+                      <div className="mt-1 text-xs text-[#71717a]">
+                        18 dead stock items resolved
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center gap-2">
+                      <div className="flex-1 bg-[#1b1b24] h-2 rounded-full overflow-hidden">
+                        <div className="bg-[#4aba7a] h-full rounded-full" style={{ width: "72%" }} />
+                      </div>
+                      <span className="text-[10px] font-semibold text-[#4aba7a] tabular-nums">72%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Main Centerpiece: Tall Dynamic Forecasting Chart ── */}
+                <div className="p-6 md:p-8 bg-[#0b0b0f] border-b border-white/5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-[#f4f4f5]">
+                          AI Predictive Velocity & Restock Thresholds
+                        </h4>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#d4a853]/15 text-[#f5cf7b] border border-[#d4a853]/30">
+                          95% Confidence Interval
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#71717a] mt-0.5">
+                        Historical sales demand merged with automated supplier lead-time triggers.
+                      </p>
+                    </div>
+
+                    {/* Chart Legend */}
+                    <div className="flex items-center gap-4 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-0.5 bg-[#d4a853] inline-block" />
+                        <span className="text-[#97979d]">Actual Demand</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-0.5 bg-[#38bdf8] border-b border-dashed border-[#38bdf8] inline-block" />
+                        <span className="text-[#97979d]">ML Forecast</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-3 h-0.5 bg-[#f87171] inline-block" />
+                        <span className="text-[#97979d]">Safety Threshold</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tall High-Resolution Graph */}
+                  <div className="relative w-full h-64 md:h-72 rounded-xl bg-[rgba(15,15,20,0.7)] p-4 border border-white/5 overflow-hidden">
+                    <svg className="w-full h-full" viewBox="0 0 900 240" preserveAspectRatio="none">
+                      <defs>
+                        {/* Forecast confidence band gradient */}
+                        <linearGradient id="forecastArea" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.22" />
+                          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.02" />
+                        </linearGradient>
+                        <linearGradient id="actualArea" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#d4a853" stopOpacity="0.3" />
+                          <stop offset="100%" stopColor="#d4a853" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Gridlines */}
+                      <line x1="0" y1="40" x2="900" y2="40" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                      <line x1="0" y1="90" x2="900" y2="90" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                      <line x1="0" y1="140" x2="900" y2="140" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+                      <line x1="0" y1="190" x2="900" y2="190" stroke="rgba(255,255,255,0.05)" strokeDasharray="3 3" />
+
+                      {/* Critical Safety Stock Threshold line */}
+                      <line x1="0" y1="165" x2="900" y2="165" stroke="#f87171" strokeWidth="1.5" strokeDasharray="6 4" opacity="0.65" />
+                      <text x="12" y="160" fill="#f87171" fontSize="10" fontWeight="600" opacity="0.8">
+                        CRITICAL SAFETY BUFFER: 350 UNITS
+                      </text>
+
+                      {/* Actual historical area fill */}
+                      <polygon
+                        fill="url(#actualArea)"
+                        points="0,150 70,140 140,145 210,120 280,130 350,85 420,50 490,95 560,110 560,220 0,220"
+                      />
+
+                      {/* Forecast confidence envelope */}
+                      <polygon
+                        fill="url(#forecastArea)"
+                        points="560,110 630,70 700,55 770,75 840,40 900,30 900,120 840,115 770,145 700,135 630,130 560,110"
+                      />
+
+                      {/* Actual historical line */}
+                      <path
+                        d="M0,150 L70,140 L140,145 L210,120 L280,130 L350,85 L420,50 L490,95 L560,110"
+                        fill="none"
+                        stroke="#d4a853"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* Forecast projected trajectory */}
+                      <path
+                        d="M560,110 L630,95 L700,90 L770,105 L840,75 L900,60"
+                        fill="none"
+                        stroke="#38bdf8"
+                        strokeWidth="2.5"
+                        strokeDasharray="6 4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* Peak Anomaly Pulse Circle */}
+                      <circle cx="420" cy="50" r="5" fill="#f5cf7b" stroke="#0e0e14" strokeWidth="2" />
+                      <circle cx="420" cy="50" r="10" fill="none" stroke="#d4a853" strokeWidth="1.5" opacity="0.6" className="animate-ping" />
+
+                      {/* Restock PO Trigger Circle */}
+                      <circle cx="560" cy="110" r="5" fill="#38bdf8" stroke="#0e0e14" strokeWidth="2" />
+                    </svg>
+
+                    {/* Interactive Marker Callouts */}
+                    <div
+                      className="absolute hidden md:block px-3 py-1.5 rounded-lg bg-[#1a1712] border border-[#d4a853]/40 shadow-xl pointer-events-none"
+                      style={{ top: "18%", left: "41%" }}
+                    >
+                      <div className="text-[10px] font-bold text-[#f5cf7b]">Flash Sale Spike</div>
+                      <div className="text-[9px] text-[#97979d]">+142% Velocity · 1,420 units/day</div>
+                    </div>
+
+                    <div
+                      className="absolute hidden md:block px-3 py-1.5 rounded-lg bg-[#0e1622] border border-[#38bdf8]/40 shadow-xl pointer-events-none"
+                      style={{ top: "42%", left: "58%" }}
+                    >
+                      <div className="text-[10px] font-bold text-[#38bdf8]">Automated PO #4912 Triggered</div>
+                      <div className="text-[9px] text-[#97979d]">Lead Time: 4 days · +2,400 units arriving</div>
+                    </div>
+
+                    {/* Timeline Axis */}
+                    <div className="absolute bottom-2 left-4 right-4 flex justify-between text-[10px] text-[#71717a] font-mono">
+                      <span>Aug 15</span>
+                      <span>Aug 22</span>
+                      <span>Aug 29</span>
+                      <span>Sep 05</span>
+                      <span className="text-[#d4a853]">Today (Sep 16)</span>
+                      <span className="text-[#38bdf8]">Sep 23 (Projected)</span>
+                      <span className="text-[#38bdf8]">Sep 30</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Lower Cockpit: Dual Column Execution & Catalog Matrix ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-px bg-white/5">
+                  {/* Left Column: Automated Restock Action Queue */}
+                  <div className="lg:col-span-5 p-6 bg-[#0e0e14]">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#d4a853]" />
+                        <h5 className="text-xs font-bold text-[#f4f4f5] uppercase tracking-wider">
+                          Restock Action Queue
+                        </h5>
+                      </div>
+                      <span className="text-[11px] text-[#d4a853] font-medium">3 Pending Actions</span>
+                    </div>
+
+                    <div className="space-y-3">
+                      {/* Action Item 1 */}
+                      <div className="p-3.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-white/5 hover:border-[#d4a853]/30 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-[#f4f4f5]">Sony WH-1000XM5 (Black)</span>
+                            <div className="text-[11px] text-[#d45a4a] font-medium mt-0.5">
+                              ● Stock: 14 units left (1.8 days buffer)
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#d45a4a]/20 text-[#f87171] border border-[#d45a4a]/30">
+                            Urgent PO
+                          </span>
+                        </div>
+                        <div className="mt-2.5 flex items-center justify-between text-[11px] pt-2 border-t border-white/5">
+                          <span className="text-[#71717a]">Lead time: 5 days</span>
+                          <button className="px-2.5 py-1 rounded bg-[#d4a853]/20 hover:bg-[#d4a853]/30 text-[#f5cf7b] border border-[#d4a853]/40 font-medium text-[10px] transition-colors">
+                            Dispatch PO (+250 Units)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Action Item 2 */}
+                      <div className="p-3.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-white/5 hover:border-[#38bdf8]/30 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-[#f4f4f5]">Keychron Q1 Wireless Keyboard</span>
+                            <div className="text-[11px] text-[#38bdf8] font-medium mt-0.5">
+                              ● Supplier Bottleneck (+3.2 days transit)
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/30">
+                            In Transit
+                          </span>
+                        </div>
+                        <div className="mt-2.5 flex items-center justify-between text-[11px] pt-2 border-t border-white/5">
+                          <span className="text-[#71717a]">Carrier: Apex Freight</span>
+                          <span className="text-[10px] text-[#e8e6e3] font-medium">ETA: Tomorrow 11:30</span>
+                        </div>
+                      </div>
+
+                      {/* Action Item 3 */}
+                      <div className="p-3.5 rounded-xl bg-[rgba(255,255,255,0.03)] border border-white/5 hover:border-[#4aba7a]/30 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="text-xs font-bold text-[#f4f4f5]">Nomad Leather Desk Pad</span>
+                            <div className="text-[11px] text-[#d4a853] font-medium mt-0.5">
+                              ● Stagnant Velocity (45 days no sale)
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#d4a853]/20 text-[#f5cf7b] border border-[#d4a853]/30">
+                            Dead Stock
+                          </span>
+                        </div>
+                        <div className="mt-2.5 flex items-center justify-between text-[11px] pt-2 border-t border-white/5">
+                          <span className="text-[#71717a]">Holding cost: $210/mo</span>
+                          <button className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-[#e8e6e3] font-medium text-[10px] transition-colors">
+                            Apply Markdown -15%
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Live SKU Health Table */}
+                  <div className="lg:col-span-7 p-6 bg-[#0e0e14]">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+                        <h5 className="text-xs font-bold text-[#f4f4f5] uppercase tracking-wider">
+                          Monitored Catalog Health Matrix
+                        </h5>
+                      </div>
+                      <span className="text-[11px] text-[#71717a]">48 Active SKUs tracked</span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead>
+                          <tr className="border-b border-white/5 text-[10px] uppercase font-semibold text-[#71717a]">
+                            <th className="pb-2.5 font-medium">SKU / Product</th>
+                            <th className="pb-2.5 font-medium">Category</th>
+                            <th className="pb-2.5 font-medium">Stock Level</th>
+                            <th className="pb-2.5 font-medium">Run-Out Est.</th>
+                            <th className="pb-2.5 font-medium text-right">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 text-[11px]">
+                          <tr>
+                            <td className="py-3">
+                              <div className="font-semibold text-[#f4f4f5]">Sony WH-1000XM5</div>
+                              <div className="text-[10px] text-[#71717a]">SKU-9821</div>
+                            </td>
+                            <td className="py-3 text-[#97979d]">Audio & Peripherals</td>
+                            <td className="py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[#f87171] font-bold">14</span>
+                                <div className="w-14 bg-[#1b1b24] h-1.5 rounded-full overflow-hidden">
+                                  <div className="bg-[#f87171] h-full rounded-full" style={{ width: "12%" }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 text-[#f87171] font-medium">1.8 Days</td>
+                            <td className="py-3 text-right">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#d45a4a]/20 text-[#f87171] border border-[#d45a4a]/30">
+                                Stockout Risk
+                              </span>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="py-3">
+                              <div className="font-semibold text-[#f4f4f5]">Ergonomic Task Chair V2</div>
+                              <div className="text-[10px] text-[#71717a]">SKU-4412</div>
+                            </td>
+                            <td className="py-3 text-[#97979d]">Furniture</td>
+                            <td className="py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[#4aba7a] font-bold">184</span>
+                                <div className="w-14 bg-[#1b1b24] h-1.5 rounded-full overflow-hidden">
+                                  <div className="bg-[#4aba7a] h-full rounded-full" style={{ width: "82%" }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 text-[#97979d]">44 Days</td>
+                            <td className="py-3 text-right">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#4aba7a]/20 text-[#4aba7a] border border-[#4aba7a]/30">
+                                Optimal
+                              </span>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="py-3">
+                              <div className="font-semibold text-[#f4f4f5]">Keychron Q1 Mechanical</div>
+                              <div className="text-[10px] text-[#71717a]">SKU-3304</div>
+                            </td>
+                            <td className="py-3 text-[#97979d]">Hardware</td>
+                            <td className="py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[#38bdf8] font-bold">42</span>
+                                <div className="w-14 bg-[#1b1b24] h-1.5 rounded-full overflow-hidden">
+                                  <div className="bg-[#38bdf8] h-full rounded-full" style={{ width: "38%" }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 text-[#97979d]">8 Days</td>
+                            <td className="py-3 text-right">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#38bdf8]/20 text-[#38bdf8] border border-[#38bdf8]/30">
+                                PO In Transit
+                              </span>
+                            </td>
+                          </tr>
+
+                          <tr>
+                            <td className="py-3">
+                              <div className="font-semibold text-[#f4f4f5]">USB-C 100W Braided Cable</div>
+                              <div className="text-[10px] text-[#71717a]">SKU-7193</div>
+                            </td>
+                            <td className="py-3 text-[#97979d]">Accessories</td>
+                            <td className="py-3">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-[#f5cf7b] font-bold">1,420</span>
+                                <div className="w-14 bg-[#1b1b24] h-1.5 rounded-full overflow-hidden">
+                                  <div className="bg-[#d4a853] h-full rounded-full" style={{ width: "95%" }} />
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 text-[#97979d]">140+ Days</td>
+                            <td className="py-3 text-right">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#d4a853]/20 text-[#f5cf7b] border border-[#d4a853]/30">
+                                Surplus Risk
+                              </span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            HOW IT WORKS
+        ════════════════════════════════════════════════════════════════════ */}
+        <section id="how-it-works" className="relative z-10 py-20 px-6 md:px-12">
+          <div className="max-w-6xl mx-auto">
+            <Reveal>
+              <SectionHeader
+                badge="Workflow"
+                title="Three simple steps to perfect stock"
+                subtitle="Go from inventory guesswork to automated, high-precision replenishment."
+              />
+            </Reveal>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative">
+              {[
+                {
+                  step: "01",
+                  title: "Connect your inventory",
+                  desc: "Import your product catalog and sales history via one-click CSV upload, Shopify, or our REST API.",
+                },
+                {
+                  step: "02",
+                  title: "AI predicts demand curves",
+                  desc: "Machine learning models train on your sales patterns, calculating seasonal velocity and supplier lead-time buffers.",
+                },
+                {
+                  step: "03",
+                  title: "Act with confidence",
+                  desc: "Receive automated restock recommendations, anomaly notifications, and clear dead-stock alerts directly on your dashboard.",
+                },
+              ].map((pipe, i) => (
+                <Reveal key={pipe.step} delay={i * 100}>
+                  <div
+                    className="p-7 rounded-2xl flex flex-col justify-between h-full border border-white/5 hover:border-[#d4a853]/30 transition-all"
+                    style={{ background: "rgba(14,14,18,0.65)", backdropFilter: "blur(14px)" }}
+                  >
+                    <div>
+                      <span
+                        className="text-4xl font-extrabold"
+                        style={{
+                          background: "linear-gradient(135deg, #d4a853, #f5cf7b)",
+                          WebkitBackgroundClip: "text",
+                          WebkitTextFillColor: "transparent",
+                          backgroundClip: "text",
+                        }}
+                      >
+                        {pipe.step}
+                      </span>
+                      <h3 className="text-lg font-bold text-[#f4f4f5] mt-4 mb-2">{pipe.title}</h3>
+                      <p className="text-xs text-[#97979d] leading-relaxed">{pipe.desc}</p>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ════════════════════════════════════════════════════════════════════
+            PRICING SECTION
+        ════════════════════════════════════════════════════════════════════ */}
+        <section id="pricing" className="relative z-10 py-24 px-6 md:px-12">
+          <div className="max-w-6xl mx-auto">
+            <Reveal>
+              <SectionHeader
+                badge="Pricing Plans"
+                title="Simple, transparent pricing for growing teams"
+                subtitle="Start with a 14-day trial. Upgrade, downgrade, or cancel at any time."
+              />
+            </Reveal>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+              {[
+                {
+                  name: "Starter",
+                  desc: "Best for emerging brands and single-store retailers.",
+                  price: "$49",
+                  period: "/month",
+                  popular: false,
+                  features: [
+                    "Up to 2,500 active SKUs",
+                    "Daily ML demand forecasts",
+                    "Spike & anomaly alerts",
+                    "Dead-stock identification",
+                    "CSV & Shopify integration",
+                    "Standard email support",
+                  ],
+                  cta: "Start 14-day trial",
+                  link: "/register",
+                },
+                {
+                  name: "Growth",
+                  desc: "For scaling multi-channel brands and high-turnover retailers.",
+                  price: "$149",
+                  period: "/month",
+                  popular: true,
+                  features: [
+                    "Up to 25,000 active SKUs",
+                    "Real-time inventory sync",
+                    "Multi-warehouse lead-time tracking",
+                    "Automated restock simulator",
+                    "Supplier reliability scoring",
+                    "StockPilot AI copilot access",
+                    "Priority 24/7 support",
+                  ],
+                  cta: "Start Free Trial",
+                  link: "/register",
+                },
+                {
+                  name: "Enterprise",
+                  desc: "For multi-warehouse operations, 3PLs, and global logistics hubs.",
+                  price: "Custom",
+                  period: "",
+                  popular: false,
+                  features: [
+                    "Unlimited SKUs & warehouses",
+                    "Custom machine learning models",
+                    "Dedicated solutions architect",
+                    "Custom ERP & EDI integrations",
+                    "99.99% Uptime SLA guarantee",
+                    "SOC-2 Type II compliance reports",
+                    "Dedicated account manager",
+                  ],
+                  cta: "Contact Enterprise Sales",
+                  link: "/register",
+                },
+              ].map((tier, i) => (
+                <Reveal key={tier.name} delay={i * 90}>
+                  <div
+                    className={`p-8 rounded-2xl flex flex-col justify-between h-full relative transition-all duration-300 ${
+                      tier.popular
+                        ? "border border-[#d4a853] shadow-[0_0_40px_rgba(212,168,83,0.15)] bg-[#121217]"
+                        : "border border-white/5 bg-[#0e0e12] hover:border-white/15"
+                    }`}
+                  >
+                    {tier.popular && (
+                      <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase text-[#0c0c0e] bg-gradient-to-r from-[#d4a853] to-[#f5cf7b]">
+                        Most Popular
+                      </div>
+                    )}
+
+                    <div>
+                      <h3 className="text-lg font-bold text-[#f4f4f5]">{tier.name}</h3>
+                      <p className="text-xs text-[#97979d] mt-1 mb-6 leading-relaxed">{tier.desc}</p>
+
+                      <div className="flex items-baseline gap-1 mb-6">
+                        <span className="text-4xl font-extrabold text-[#f4f4f5]">{tier.price}</span>
+                        {tier.period && <span className="text-xs text-[#97979d]">{tier.period}</span>}
+                      </div>
+
+                      <div className="space-y-3 pt-6 border-t border-white/5">
+                        {tier.features.map((feat) => (
+                          <div key={feat} className="flex items-center gap-2.5 text-xs text-[#d1d1d6]">
+                            <svg className="w-4 h-4 text-[#d4a853] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>{feat}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-8 pt-6 border-t border-white/5">
+                      <Link
+                        to={tier.link}
+                        className={`w-full py-3 rounded-xl text-xs font-semibold text-center block transition-all ${
+                          tier.popular
+                            ? "bg-gradient-to-r from-[#d4a853] to-[#f5cf7b] text-[#0c0c0e] hover:scale-[1.02] shadow-[0_0_20px_rgba(212,168,83,0.25)]"
+                            : "bg-white/5 text-[#e8e6e3] hover:bg-white/10"
+                        }`}
+                      >
+                        {tier.cta}
+                      </Link>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </section>
+
+
+
+        {/* ════════════════════════════════════════════════════════════════════
+            BOTTOM CTA
+        ════════════════════════════════════════════════════════════════════ */}
+        <section className="relative z-10 py-28 px-6 md:px-12">
+          <div className="max-w-3xl mx-auto text-center relative">
+            <div
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full pointer-events-none"
+              style={{
+                background: "radial-gradient(circle, rgba(212,168,83,0.08) 0%, transparent 70%)",
+                filter: "blur(60px)",
+              }}
+            />
+            <Reveal>
+              <h2 className="text-3xl md:text-4xl font-extrabold text-[#f4f4f5] tracking-tight mb-4">
+                Ready to take complete control of your inventory?
+              </h2>
+            </Reveal>
+            <Reveal delay={60}>
+              <p className="text-sm text-[#97979d] mb-8 max-w-lg mx-auto leading-relaxed">
+                Connect your store in under two minutes. Experience proactive demand forecasting with zero commitment.
+              </p>
+            </Reveal>
+            <Reveal delay={120}>
+              <Link
+                to="/register"
+                id="bottom-cta-btn"
+                className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-sm font-semibold text-[#0c0c0e] transition-all hover:scale-[1.04] active:scale-100 shadow-[0_0_35px_rgba(212,168,83,0.3)]"
+                style={{ background: "linear-gradient(135deg, #d4a853, #f5cf7b)" }}
+              >
+                <span>Get Started for Free</span>
+                <span>→</span>
+              </Link>
+            </Reveal>
+            <Reveal delay={160}>
+              <div className="mt-5">
+                <Link
+                  to="/login"
+                  id="bottom-login-link"
+                  className="text-xs text-[#71717a] hover:text-[#d4a853] transition-colors"
+                >
+                  Already have an account? Sign in here
+                </Link>
+              </div>
+            </Reveal>
+          </div>
+        </section>
+
+      {/* Close the particle background wrapper */}
+      </div>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          LARGE RICH FOOTER
+      ════════════════════════════════════════════════════════════════════ */}
+      <footer className="relative z-10 bg-[#08080a] border-t border-white/5 pt-16 pb-12 px-6 md:px-12">
+        <div className="max-w-7xl mx-auto">
+          {/* Main 5-Column Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-10 pb-12 border-b border-white/5">
+            {/* Column 1: Brand & Bio */}
+            <div className="col-span-2">
+              <Link to="/" className="select-none inline-block">
+                <StockPilotLogo size="md" />
+              </Link>
+              <p className="mt-4 text-xs text-[#97979d] leading-relaxed max-w-sm">
+                StockPilot is the intelligent inventory management platform. We help retailers, warehouses, and brands predict demand, eliminate stockouts, and unlock trapped working capital with machine learning.
+              </p>
+              
+              {/* System Status Pill */}
+              <div className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[rgba(74,186,122,0.08)] border border-[rgba(74,186,122,0.25)] text-[11px] text-[#4aba7a]">
+                <span className="w-2 h-2 rounded-full bg-[#4aba7a] animate-pulse" />
+                <span>All Systems Operational</span>
+              </div>
+            </div>
+
+            {/* Column 2: Product */}
+            <div>
+              <h4 className="text-xs font-semibold text-[#f4f4f5] uppercase tracking-wider mb-4">
+                Product
+              </h4>
+              <ul className="space-y-2.5 text-xs text-[#97979d]">
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Demand Forecasting</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Anomaly Alerts</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Dead Stock Analyzer</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Restock Simulator</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Supplier Tracking</a></li>
+                <li><a href="#dashboard" className="hover:text-[#d4a853] transition-colors">Live Dashboard</a></li>
+                <li><a href="#pricing" className="hover:text-[#d4a853] transition-colors">Pricing & Plans</a></li>
+              </ul>
+            </div>
+
+            {/* Column 3: Solutions */}
+            <div>
+              <h4 className="text-xs font-semibold text-[#f4f4f5] uppercase tracking-wider mb-4">
+                Solutions
+              </h4>
+              <ul className="space-y-2.5 text-xs text-[#97979d]">
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">E-Commerce Brands</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Retail & Multi-Store</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Wholesale & B2B</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">3PL & Fulfillment</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Fast Fashion & Apparel</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Electronics & Hardware</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Enterprise Supply Chain</a></li>
+              </ul>
+            </div>
+
+            {/* Column 4: Resources & Company */}
+            <div>
+              <h4 className="text-xs font-semibold text-[#f4f4f5] uppercase tracking-wider mb-4">
+                Resources & Company
+              </h4>
+              <ul className="space-y-2.5 text-xs text-[#97979d]">
+                <li><a href="#how-it-works" className="hover:text-[#d4a853] transition-colors">How It Works</a></li>
+                <li><a href="#dashboard" className="hover:text-[#d4a853] transition-colors">Live Simulation</a></li>
+                <li><Link to="/login" className="hover:text-[#d4a853] transition-colors">Operator Sign In</Link></li>
+                <li><Link to="/register" className="hover:text-[#d4a853] transition-colors">Create Account</Link></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Documentation</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">API Reference</a></li>
+                <li><a href="#features" className="hover:text-[#d4a853] transition-colors">Security & Privacy</a></li>
+              </ul>
             </div>
           </div>
 
-          <div>
-            <h4 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#e8e6e3] mb-4">
-              Platform
-            </h4>
-            <ul className="space-y-2.5 text-xs text-[#97979d]">
-              <li><Link to="/dashboard" className="hover:text-[#d4a853] transition-colors">Digital Twin Console</Link></li>
-              <li><Link to="/forecasts" className="hover:text-[#d4a853] transition-colors">Demand Forecasting</Link></li>
-              <li><Link to="/stockout-risks" className="hover:text-[#d4a853] transition-colors">Stockout Sentinel</Link></li>
-              <li><Link to="/simulator" className="hover:text-[#d4a853] transition-colors">Simulation Engine</Link></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#e8e6e3] mb-4">
-              Architecture
-            </h4>
-            <ul className="space-y-2.5 text-xs font-mono text-[#97979d]">
-              <li>// PostgreSQL 16 Distributed Ledger</li>
-              <li>// Three.js Spatial Digital Twin</li>
-              <li>// BullMQ Asynchronous Workers</li>
-              <li>// Strict Type-Safe RPC Protocol</li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-[11px] font-mono font-semibold uppercase tracking-wider text-[#e8e6e3] mb-4">
-              Compliance
-            </h4>
-            <ul className="space-y-2.5 text-xs text-[#97979d]">
-              <li>SOC-2 Type II Certified</li>
-              <li>Zero-Trust TLS 1.3</li>
-              <li>Air-Gapped Facility Nodes</li>
-            </ul>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto mt-12 pt-6 border-t border-[rgba(255,255,255,0.05)] flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px] font-mono text-[#5c5c64]">
-          <div>© 2026 STOCKPILOT SYSTEMS, INC. ALL RIGHTS RESERVED.</div>
-          <div className="flex items-center gap-6">
-            <Link to="/login" className="text-[#97979d] hover:text-[#d4a853] transition-colors">SIGN IN</Link>
-            <Link to="/register" className="text-[#d4a853] hover:underline font-medium">REGISTER</Link>
+          {/* Bottom Bar */}
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-between text-xs text-[#5c5c64] gap-4">
+            <p>© 2024 StockPilot Technologies, Inc. All rights reserved.</p>
+            <div className="flex items-center gap-6">
+              <span className="hover:text-[#97979d] cursor-pointer transition-colors">Privacy Policy</span>
+              <span>•</span>
+              <span className="hover:text-[#97979d] cursor-pointer transition-colors">Terms of Service</span>
+              <span>•</span>
+              <span className="hover:text-[#97979d] cursor-pointer transition-colors">Security</span>
+              <span>•</span>
+              <span className="hover:text-[#97979d] cursor-pointer transition-colors">Cookie Preferences</span>
+            </div>
           </div>
         </div>
       </footer>

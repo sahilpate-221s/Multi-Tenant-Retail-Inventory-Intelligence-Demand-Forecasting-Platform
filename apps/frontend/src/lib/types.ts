@@ -347,3 +347,57 @@ export interface RestockCommitResult {
     newStock: number;
   }[];
 }
+
+// ── Sales & Transactions ──
+
+export interface SaleLineItem {
+  id: string;
+  saleId: string;
+  productId: string;
+  productName: string;
+  productSku: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+  returnedQuantity?: number;
+}
+
+export interface Sale {
+  id: string;
+  storeId: string;
+  importId?: string | null;
+  saleDate: string;
+  totalAmount: number;
+  createdAt: string;
+  items: SaleLineItem[];
+  totalUnits: number;
+  returnStatus?: "none" | "partial" | "full";
+}
+
+export interface SalesMetrics {
+  totalRevenue: number;
+  totalUnits: number;
+  totalOrders: number;
+  avgOrderValue: number;
+}
+
+export interface SalesListResponse {
+  items: Sale[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+  metrics: SalesMetrics;
+}
+
+export interface CreateSaleInput {
+  saleDate?: string;
+  items: {
+    productId: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
+  notes?: string;
+}
