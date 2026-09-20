@@ -27,6 +27,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.2.0",
     "@types/node": "^24.13.3",
+    "autocannon": "^8.0.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^10.9.1",
     "tsx": "^4.23.12",
