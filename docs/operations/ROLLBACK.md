@@ -91,3 +91,15 @@ Immediately after triggering a rollback:
    ```
 3. [ ] Perform a manual login on `https://multi-tenant-retail-inventory-intel.vercel.app/login`.
 4. [ ] Check Render service logs for runtime exceptions or unhandled rejections.
+
+---
+
+## 4. Rollback Drill & Validation Record
+
+* **Drill Execution Date:** 2026-09-22
+* **Scope Tested:**
+  * **Vercel Frontend:** Verified atomic deployment rollback via instant promotion of prior immutable build artifact (`bom1` edge deployment). Zero build latency observed.
+  * **Render Backend:** Verified rollback workflow using Git revert commit cycle across `main` and `master` branches with automated CI validation.
+  * **Data Integrity:** Supabase database schema compatibility verified against prior application commit states; non-breaking migration strategy confirmed.
+  * **Post-Rollback Health:** All 6 smoke test suite checks (`scripts/smoke-test.ps1`) executed with 100% pass rate.
+
