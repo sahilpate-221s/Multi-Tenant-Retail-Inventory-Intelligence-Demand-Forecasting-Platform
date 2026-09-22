@@ -110,7 +110,11 @@ stockpilot/
 - Interactive sandbox enabling retailers to simulate hypothetical conditions (e.g., `+25% demand surge`, `+7 days supplier delay`, `$5,000 budget cap`).
 - Computes revised safety stocks and potential stockout dates without mutating any live production records.
 
-### 7. Grounded AI Intelligence Assistant
+### 7. Executive Analytics & Trend Trajectory
+- Dynamic multi-scale sales & revenue trajectory charts (`RevenueTrendChart.tsx`) allowing store managers to switch between daily 30-day view and 12-month macro aggregation.
+- Toggle between Gross Sales Revenue ($) and Inventory Units Moved to analyze margin velocity alongside volume.
+
+### 8. Grounded AI Intelligence Assistant
 - Powered by Gemini 2.5 Flash with structured function-calling tools:
   - `getInventoryIntelligence`: Live velocity, safety stock, and reorder status.
   - `getSalesSummary`: Revenue, margins, and top movers across custom date horizons.
@@ -119,7 +123,7 @@ stockpilot/
   - `getForecast`: Machine learning forecasts with model confidence ratings.
 - System prompt enforces strict grounded factual responses — hallucination is barred by design.
 
-### 8. High-Throughput CSV Ingestion & Bulk Restock
+### 9. High-Throughput CSV Ingestion & Bulk Restock
 - Asynchronous BullMQ background worker ingest multi-thousand-row CSV transaction files.
 - Two-phase validation: fast preview with format validation, followed by chunked background execution.
 - Warehouse Restock Upload tool with bigram Dice coefficient fuzzy matching to reconcile distributor invoice titles against catalog product names.
@@ -214,6 +218,11 @@ Create your environment configuration files:
 ```ini
 PORT=4000
 DATABASE_URL=postgresql://stockpilot:stockpilot_dev_password@localhost:5432/stockpilot
+# Connection Pool Tuning:
+DB_POOL_MAX=10
+DB_IDLE_TIMEOUT=20
+DB_CONNECT_TIMEOUT=10
+DB_PREPARE=false
 JWT_ACCESS_SECRET=your-super-secret-access-key-here
 JWT_REFRESH_SECRET=your-super-secret-refresh-key-here
 REDIS_URL=redis://localhost:6379
@@ -311,8 +320,12 @@ npm run test
 cd ../..
 npx vitest run tests/e2e/fullFlow.test.ts --config apps/backend/vitest.config.ts
 
+# Run Autocannon HTTP load testing harness (Phase 23)
+cd apps/backend
+node loadtest.js
+
 # Run Python ML service tests
-cd apps/ml
+cd ../ml
 pytest
 ```
 
@@ -323,7 +336,7 @@ pytest
 - `reorderQuantity.test.ts` & `stockoutEstimate.test.ts` — Lead time & MOQ constraints
 - `deadStockScoring.test.ts` — Stagnant capital ranking
 - `anomalyDetection.test.ts` & `hypothesisGenerator.test.ts` — Z-score diagnostics
-- **Cross-Tenant Isolation Regression Suites:**
+- **13 Cross-Tenant Isolation Regression Suites:**
   - `categories.crossTenant.test.ts`
   - `suppliers.crossTenant.test.ts`
   - `inventory.crossTenant.test.ts`
@@ -337,7 +350,9 @@ pytest
   - `returns.crossTenant.test.ts`
   - `simulator.crossTenant.test.ts`
   - `notifications.crossTenant.test.ts`
-- **E2E Integration Test:** `fullFlow.test.ts` (Register → Product → Supplier → Stock Adjust → Recommendations → Dashboard).
+- **E2E Integration Test:** `fullFlow.test.ts` (Register → Store → Products → Supplier → Inventory Adjust → Recommendations → Dashboard).
+- **Concurrency & Load Stress Test:** `loadtest.js` (Autocannon harness verifying 10+ concurrent connections against analytics aggregations).
+
 
 ---
 

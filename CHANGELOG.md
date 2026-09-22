@@ -5,6 +5,14 @@ The project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html
 
 ---
 
+## [1.1.0] — 2026-09-22 — Analytics & Security Hardening
+### Added
+- **Revenue & Demand Trajectory Trend Chart (`RevenueTrendChart.tsx`):** Interactive Recharts area visualization on Dashboard supporting Daily (30-day) and 12-Month Macro trends with dual-metric toggle (Gross Revenue vs. Units Sold).
+- **PostgreSQL Connection Pool Tuning:** Configurable client-side pooling parameters in `apps/backend/src/db/client.ts` (`DB_POOL_MAX`, `DB_IDLE_TIMEOUT`, `DB_CONNECT_TIMEOUT`) with pgBouncer / Supavisor transaction pooler compatibility (`prepare: false`).
+- **Security & CSRF Formalization:** Comprehensive audit and architectural documentation in `docs/security/SECURITY_MODEL.md` detailing header-based Bearer token CSRF immunity and automated Pino log redaction.
+
+---
+
 ## [1.0.0] — 2026-09-22 — Phase 24: Production Cloud Deployment
 ### Added
 - Cloud infrastructure live on Vercel (frontend), Render (backend & ML), Supabase (PostgreSQL 16), and Redis Cloud.
