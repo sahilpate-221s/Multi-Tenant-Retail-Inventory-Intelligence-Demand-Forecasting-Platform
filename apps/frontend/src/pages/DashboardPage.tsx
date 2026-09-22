@@ -11,6 +11,7 @@ import ErrorState from "../components/states/ErrorState";
 import { checkPrefersReducedMotion } from "../lib/motionUtils";
 import DashboardShell from "../components/layout/DashboardShell";
 import AdvancedAnalyticsSection from "../components/dashboard/AdvancedAnalyticsSection";
+import RevenueTrendChart from "../components/dashboard/RevenueTrendChart";
 
 // Lazy-load the heavy 3D scene
 const InventoryScene = lazy(
@@ -199,6 +200,15 @@ function DashboardPage() {
                 sublabel="COGS ÷ inventory value"
               />
             </div>
+          </ScrollReveal>
+
+          {/* ─── REVENUE & SALES TRAJECTORY TREND CHART ─── */}
+          <ScrollReveal className="px-8 mt-8" delay={150}>
+            <RevenueTrendChart
+              dailySales={data.dailySales}
+              monthlyTrends={data.monthlyTrends}
+              currencySymbol="₹"
+            />
           </ScrollReveal>
 
           {/* ─── CATEGORY PERFORMANCE ─── */}

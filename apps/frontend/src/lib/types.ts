@@ -116,6 +116,20 @@ export interface PreviewResult {
 }
 
 
+export interface DailySalesPoint {
+  date: string;
+  revenue: number;
+  unitsSold: number;
+  orderCount: number;
+}
+
+export interface MonthlyTrendPoint {
+  month: string;
+  revenue: number;
+  unitsSold: number;
+  orderCount: number;
+}
+
 export interface DashboardData {
   periodDays: number;
   totalRevenue: number;
@@ -125,6 +139,8 @@ export interface DashboardData {
   fastMovers: { productId: string; productName: string; unitsSold: number }[];
   slowMovers: { productId: string; productName: string; unitsSold: number; daysSinceLastSale: number | null }[];
   categoryPerformance: { categoryName: string; revenue: number }[];
+  dailySales?: DailySalesPoint[];
+  monthlyTrends?: MonthlyTrendPoint[];
 }
 
 export interface Recommendation {

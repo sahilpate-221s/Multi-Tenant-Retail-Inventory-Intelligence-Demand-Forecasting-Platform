@@ -1,9 +1,23 @@
-import { sql, gte, eq, and } from "drizzle-orm";
+import { sql, gte, eq, and, asc } from "drizzle-orm";
 import { db } from "../../db/client";
 import { sales, saleItems, products, categories, inventory } from "../../db/schema";
 import { redisConnection } from "../../queue/redisConnection";
 
 const CACHE_TTL_SECONDS = 60;
+
+export interface DailySalesPoint {
+  date: string;
+  revenue: number;
+  unitsSold: number;
+  orderCount: number;
+}
+
+export interface MonthlyTrendPoint {
+  month: string;
+  revenue: number;
+  unitsSold: number;
+  orderCount: number;
+}
 
 export interface DashboardData {
   periodDays: number;
@@ -14,6 +28,8 @@ export interface DashboardData {
   fastMovers: { productId: string; productName: string; unitsSold: number }[];
   slowMovers: { productId: string; productName: string; unitsSold: number; daysSinceLastSale: number | null }[];
   categoryPerformance: { categoryName: string; revenue: number }[];
+  dailySales: DailySalesPoint[];
+  monthlyTrends: MonthlyTrendPoint[];
 }
 
 export async function getDashboardData(storeId: string, periodDays: number): Promise<DashboardData> {
@@ -115,6 +131,38 @@ export async function getDashboardData(storeId: string, periodDays: number): Pro
     .groupBy(categories.name)
     .orderBy(sql`SUM(${saleItems.lineTotal}) DESC`);
 
+  // Daily trend points within selected period
+  const dailyRaw = await db
+    .select({
+      date: sales.saleDate,
+      revenue: sql<string>`COALESCE(SUM(${saleItems.lineTotal}), 0)`,
+      unitsSold: sql<string>`COALESCE(SUM(${saleItems.quantity}), 0)`,
+      orderCount: sql<string>`COUNT(DISTINCT ${sales.id})`,
+    })
+    .from(sales)
+    .innerJoin(saleItems, eq(sales.id, saleItems.saleId))
+    .where(and(eq(sales.storeId, storeId), gte(sales.saleDate, periodStartStr)))
+    .groupBy(sales.saleDate)
+    .orderBy(asc(sales.saleDate));
+
+  // 12-month macro business trends
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+  const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split("T")[0];
+
+  const monthlyRaw = await db
+    .select({
+      month: sql<string>`TO_CHAR(${sales.saleDate}::date, 'YYYY-MM')`,
+      revenue: sql<string>`COALESCE(SUM(${saleItems.lineTotal}), 0)`,
+      unitsSold: sql<string>`COALESCE(SUM(${saleItems.quantity}), 0)`,
+      orderCount: sql<string>`COUNT(DISTINCT ${sales.id})`,
+    })
+    .from(sales)
+    .innerJoin(saleItems, eq(sales.id, saleItems.saleId))
+    .where(and(eq(sales.storeId, storeId), gte(sales.saleDate, twelveMonthsAgoStr)))
+    .groupBy(sql`TO_CHAR(${sales.saleDate}::date, 'YYYY-MM')`)
+    .orderBy(sql`TO_CHAR(${sales.saleDate}::date, 'YYYY-MM') ASC`);
+
   const result: DashboardData = {
     periodDays,
     totalRevenue,
@@ -131,6 +179,18 @@ export async function getDashboardData(storeId: string, periodDays: number): Pro
         : null,
     })),
     categoryPerformance: categoryPerformance.map((c) => ({ ...c, revenue: Number(c.revenue) })),
+    dailySales: dailyRaw.map((d) => ({
+      date: String(d.date),
+      revenue: Number(d.revenue),
+      unitsSold: Number(d.unitsSold),
+      orderCount: Number(d.orderCount),
+    })),
+    monthlyTrends: monthlyRaw.map((m) => ({
+      month: String(m.month),
+      revenue: Number(m.revenue),
+      unitsSold: Number(m.unitsSold),
+      orderCount: Number(m.orderCount),
+    })),
   };
 
   await redisConnection.set(cacheKey, JSON.stringify(result), "EX", CACHE_TTL_SECONDS);
