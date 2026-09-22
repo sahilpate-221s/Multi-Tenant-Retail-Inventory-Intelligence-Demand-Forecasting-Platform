@@ -41,11 +41,11 @@ that, don't build speculative infrastructure before there's evidence it's needed
   behind each other — this is the concrete signal (documented in
   ADR-004's addendum) that would justify raising concurrency, paired
   with a review of per-store write contention.
-- **Connection pooling**: our current Postgres connection setup (via the
-  `postgres` driver) has not been explicitly tuned for concurrent
-  connection limits. At 10,000 stores with concurrent usage, this
-  becomes a real, measurable constraint worth load-testing (Phase 23)
-  before assuming a specific pool size is correct.
+- **Connection pooling**: tuned and parameterized in `apps/backend/src/db/client.ts`.
+  Exposes configurable environment controls (`DB_POOL_MAX`, `DB_IDLE_TIMEOUT`,
+  `DB_CONNECT_TIMEOUT`, and `DB_PREPARE=false` for transaction-mode poolers
+  like Supavisor/pgBouncer). Verified under sustained load using the Phase 23
+  Autocannon load harness (`loadtest.js`) across concurrent API sessions.
 
 ### 10,000 stores → 100M sales records
 - **Table partitioning**: `sales`, `sale_items`, and `inventory_movements`
