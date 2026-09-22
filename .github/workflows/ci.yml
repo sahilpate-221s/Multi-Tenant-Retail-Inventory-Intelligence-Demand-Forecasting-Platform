@@ -10,6 +10,30 @@ jobs:
   backend:
     name: Backend CI
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: stockpilot
+          POSTGRES_PASSWORD: stockpilot_dev_password
+          POSTGRES_DB: stockpilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,11 +43,15 @@ jobs:
       - run: npm ci
       - name: Build
         run: npm run build --workspace=apps/backend
+      - name: Run Migrations
+        run: cd apps/backend && npx drizzle-kit migrate
+        env:
+          DATABASE_URL: postgresql://stockpilot:stockpilot_dev_password@127.0.0.1:5432/stockpilot
       - name: Test
         run: npm run test --workspace=apps/backend
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/stockpilot
-          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://stockpilot:stockpilot_dev_password@127.0.0.1:5432/stockpilot
+          REDIS_URL: redis://127.0.0.1:6379
           JWT_ACCESS_SECRET: ci-test-access-secret
           JWT_REFRESH_SECRET: ci-test-refresh-secret
 
