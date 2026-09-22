@@ -13,6 +13,116 @@ StockPilot uses a **Shared Database, Shared Schema with Tenant Discriminator** d
 
 ---
 
+## 2. Entity Relationship Diagram (ERD)
+
+```mermaid
+erDiagram
+    stores ||--o{ users : "has"
+    stores ||--o{ categories : "defines"
+    stores ||--o{ suppliers : "contracts"
+    stores ||--o{ products : "sells"
+    stores ||--o{ inventory : "tracks"
+    stores ||--o{ sales : "records"
+    stores ||--o{ purchase_orders : "issues"
+    stores ||--o{ imports : "processes"
+    stores ||--o{ audit_logs : "captures"
+    stores ||--o{ reorder_recommendations : "generates"
+
+    users ||--o{ refresh_tokens : "owns"
+    categories ||--o{ products : "classifies"
+    suppliers ||--o{ supplier_products : "supplies"
+    products ||--o{ supplier_products : "supplied_by"
+    products ||--o{ inventory : "stocks"
+    products ||--o{ sale_items : "sold_in"
+    products ||--o{ purchase_order_items : "ordered_in"
+    products ||--o{ forecasts : "modeled_in"
+    products ||--o{ reorder_recommendations : "targets"
+
+    sales ||--o{ sale_items : "contains"
+    sales ||--o{ returns : "refunded_by"
+    purchase_orders ||--o{ purchase_order_items : "contains"
+    inventory ||--o{ inventory_audit_log : "logs_movements"
+
+    stores {
+        uuid id PK
+        string name
+        string timezone
+        string currency
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    users {
+        uuid id PK
+        uuid store_id FK
+        string email UK
+        string password_hash
+        string role
+        timestamp created_at
+    }
+
+    products {
+        uuid id PK
+        uuid store_id FK
+        uuid category_id FK
+        string name
+        string sku UK
+        string barcode
+        numeric cost_price
+        numeric selling_price
+        boolean is_active
+    }
+
+    inventory {
+        uuid id PK
+        uuid store_id FK
+        uuid product_id FK
+        integer quantity_on_hand
+        integer reorder_point
+        integer reorder_quantity
+        integer safety_stock
+        timestamp updated_at
+    }
+
+    sales {
+        uuid id PK
+        uuid store_id FK
+        uuid user_id FK
+        numeric total_amount
+        string payment_method
+        timestamp created_at
+    }
+
+    sale_items {
+        uuid id PK
+        uuid sale_id FK
+        uuid product_id FK
+        integer quantity
+        numeric unit_price
+        numeric subtotal
+    }
+
+    purchase_orders {
+        uuid id PK
+        uuid store_id FK
+        uuid supplier_id FK
+        string status
+        numeric total_cost
+        timestamp created_at
+    }
+
+    reorder_recommendations {
+        uuid id PK
+        uuid store_id FK
+        uuid product_id FK
+        integer recommended_qty
+        string urgency
+        string status
+    }
+```
+
+---
+
 ## 2. Table Catalog (25 Tables)
 
 ### 2.1 Core & Multi-Tenancy

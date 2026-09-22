@@ -341,26 +341,71 @@ pytest
 
 ---
 
+## 🚀 Live Cloud Deployments
+
+| Service | Platform | URL | Status |
+| :--- | :--- | :--- | :--- |
+| **Frontend Application** | Vercel | [https://multi-tenant-retail-inventory-intel.vercel.app](https://multi-tenant-retail-inventory-intel.vercel.app) | 🟢 Live |
+| **Backend API** | Render | `https://multi-tenant-retail-inventory.onrender.com` | 🟢 Live |
+| **Database** | Supabase | Managed PostgreSQL 16 (AWS Seoul) | 🟢 Active |
+| **Queue & Cache** | Redis Cloud | Managed Redis 7 Cluster | 🟢 Active |
+| **CI / CD** | GitHub Actions | Automated Lint, Test & Build | 🟢 Active |
+
+---
+
 ## 💻 Technology Stack
 
 | Layer | Technologies |
 | :--- | :--- |
 | **Frontend** | React 19, TypeScript, Vite, Tailwind CSS, Lucide Icons, Three.js / React Three Fiber |
-| **Backend** | Node.js 20+, Express 5, TypeScript, Drizzle ORM, Zod, Pino Logger, Nanoid |
-| **ML Microservice** | Python 3.10+, FastAPI, NumPy, Pandas, Scikit-learn, Statsmodels, Uvicorn |
+| **Backend** | Node.js 22, Express 5, TypeScript, Drizzle ORM, Zod, Pino Logger, Nanoid |
+| **ML Microservice** | Python 3.12, FastAPI, NumPy, Pandas, Scikit-learn, Statsmodels, Uvicorn |
 | **Datastores & Queues** | PostgreSQL 16, Redis 7, BullMQ |
 | **Generative AI** | Google Gemini 2.5 Flash SDK (Multi-round function calling) |
-| **Testing** | Vitest, Supertest, Pytest |
-| **DevOps & Tooling** | Docker Compose, ESLint, Prettier, Dotenv |
+| **Testing** | Vitest (107 backend tests, frontend tests), Pytest |
+| **Cloud & DevOps** | Vercel, Render, Supabase, Redis Cloud, GitHub Actions CI/CD |
 
 ---
 
-## 📚 Project Documentation
+## 📚 Project Documentation Catalog
 
-- [Comprehensive Architectural Audit](PROJECT_COMPREHENSIVE_AUDIT.md) — 200-line deep dive into architectural scores, metrics, and security.
-- [Step-by-Step Testing Guide](STEP_BY_STEP_TESTING_GUIDE.md) — Manual testing instructions covering every user journey.
-- [ADR-004: Performance Indexing Decision](docs/decisions/ADR-004-performance-indexing.md) — PostgreSQL `EXPLAIN ANALYZE` benchmarking and rationale.
-- [Architecture Overview](docs/architecture/ARCHITECTURE.md) — Detailed diagrams and system component interactions.
+### 🏛 Architecture & Engineering
+- [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) — Topology, component roles, and interaction diagrams.
+- [Data Flow](docs/architecture/DATA_FLOW.md) — Request flows for auth, POS checkout, CSV ingestion, and ML forecasting.
+- [Background Job Architecture](docs/architecture/JOB_ARCHITECTURE.md) — BullMQ job processing, queue topology, and retries.
+- [AI Copilot Architecture](docs/architecture/AI_ARCHITECTURE.md) — Grounded tool calling and prompt injection defenses.
+- [Machine Learning Architecture](docs/architecture/ML_ARCHITECTURE.md) — Time-series models, backtesting, and evaluation metrics.
+- [Horizontal Scaling Strategy](docs/architecture/scaling-strategy.md) — Multi-store scaling and load balancing.
+
+### 💾 Database & Storage
+- [Database Schema & ERD](docs/database/SCHEMA_AND_MIGRATIONS.md) — 25-table catalog, full Mermaid ER diagram, and Drizzle migrations.
+- [ADR-004: Performance Indexing](docs/decisions/ADR-004-performance-indexing.md) — B-tree indexing and `EXPLAIN ANALYZE` benchmarks.
+
+### 📡 API & Interfaces
+- [REST API Reference](docs/api/API_REFERENCE.md) — Endpoint specifications, payloads, responses, and error envelopes.
+
+### 🔒 Security & Compliance
+- [Security Model & Hardening](docs/security/SECURITY_MODEL.md) — Multi-tenant data defense, dual-token JWT, and injection protection.
+
+### ⚙️ Operations & Deployment
+- [Production Deployment Guide](docs/operations/DEPLOYMENT.md) — Cloud setup, environment variables, and verification.
+- [Production Rollback Playbook](docs/operations/ROLLBACK.md) — Zero-downtime rollback procedures for Vercel, Render, and database.
+- [Monitoring & Observability](docs/operations/MONITORING.md) — Health check contracts (`/live`, `/ready`, `/health`) and live log streaming.
+
+### 📝 Architectural Decision Records (ADRs)
+- [ADR-001: PostgreSQL 16 & Drizzle ORM](docs/decisions/ADR-001-postgresql-drizzle-orm.md)
+- [ADR-002: Modular Monolith Architecture](docs/decisions/ADR-002-modular-monolith-architecture.md)
+- [ADR-003: Asynchronous Jobs via BullMQ & Redis](docs/decisions/ADR-003-bullmq-redis-async-jobs.md)
+- [ADR-004: Performance Indexing Strategy](docs/decisions/ADR-004-performance-indexing.md)
+- [ADR-005: Dual-Token Authentication](docs/decisions/ADR-005-dual-token-authentication.md)
+- [ADR-006: Hybrid AI Architecture](docs/decisions/ADR-006-hybrid-ai-deterministic-forecasting.md)
+
+### 📋 Project Management & Audits
+- [Project Status (Phase 24 Complete)](PROJECT_STATUS.md) — Complete phase-by-phase completion log.
+- [Comprehensive Architectural Audit](PROJECT_COMPREHENSIVE_AUDIT.md) — Evaluation and quality metrics.
+- [Step-by-Step Testing Guide](STEP_BY_STEP_TESTING_GUIDE.md) — Detailed manual testing journeys.
+- [Changelog](CHANGELOG.md) — Historical release log.
+- [Contributing Guide](CONTRIBUTING.md) — Development setup and contribution workflows.
 
 ---
 
