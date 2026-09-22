@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Build
@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Build
@@ -70,7 +70,7 @@ jobs:
         env:
           VITE_API_URL: https://multi-tenant-retail-inventory.onrender.com
       - name: Test
-        run: npm run test --workspace=apps/frontend
+        run: cd apps/frontend && npx vitest run
 
   ml:
     name: ML Service CI

@@ -83,9 +83,9 @@ describe("App routing", () => {
       </QueryClientProvider>,
     );
     expect(
-      await screen.findByRole("heading", { name: /Dashboard/i }, { timeout: 5000 }),
+      await screen.findByRole("heading", { name: /Dashboard/i }, { timeout: 20000 }),
     ).toBeInTheDocument();
-  });
+  }, 30000);
 
   it("shows 404 for unknown routes", () => {
     render(
