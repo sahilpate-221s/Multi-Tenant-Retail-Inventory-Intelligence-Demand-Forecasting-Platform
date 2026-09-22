@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, Suspense } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/authContext";
 import { useStoreSettings } from "../hooks/useSettings";
@@ -422,7 +422,15 @@ function AppLayout() {
 
           {/* Page Content Viewport */}
           <div className="relative z-10 flex-1 min-h-0">
-            <Outlet />
+            <Suspense
+              fallback={
+                <div className="flex h-64 items-center justify-center">
+                  <div className="w-7 h-7 rounded-full border-2 border-[#d4a853] border-t-transparent animate-spin" />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
           </div>
         </main>
       </div>

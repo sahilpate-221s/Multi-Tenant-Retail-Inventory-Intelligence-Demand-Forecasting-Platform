@@ -21,7 +21,7 @@ function formatCurrency(n: number): string {
  * Graphite background, thin grid, amber bars, monospaced numbers.
  */
 function CategoryChart({ data }: CategoryChartProps) {
-  if (data.length === 0) {
+  if (!data || data.length === 0) {
     return (
       <div
         className="flex items-center justify-center py-12"

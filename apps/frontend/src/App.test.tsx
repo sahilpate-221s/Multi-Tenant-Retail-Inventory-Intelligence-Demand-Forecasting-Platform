@@ -17,8 +17,51 @@ vi.mock("./lib/authContext", () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
+vi.mock("@react-three/fiber", () => ({
+  Canvas: ({ children }: any) => <div data-testid="r3f-canvas">{children}</div>,
+  useFrame: vi.fn(),
+  useThree: () => ({
+    camera: { position: { set: vi.fn(), x: 0, y: 0, z: 0 }, lookAt: vi.fn() },
+    scene: {},
+    gl: { domElement: document.createElement("canvas") },
+  }),
+}));
+
+vi.mock("@react-three/drei", () => ({
+  Float: ({ children }: any) => <div>{children}</div>,
+  MeshDistortMaterial: () => null,
+  MeshTransmissionMaterial: () => null,
+  Stars: () => null,
+  OrbitControls: () => null,
+}));
+
+vi.mock("./hooks/useDashboard", () => ({
+  useDashboard: () => ({
+    data: {
+      totalRevenue: 500000,
+      unitsSold: 120,
+      inventoryValue: 250000,
+      turnoverRatio: 4.2,
+      fastMovers: [],
+      slowMovers: [],
+      categoryBreakdown: [],
+      dailySales: [],
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
+vi.mock("./hooks/useSettings", () => ({
+  useStoreSettings: () => ({
+    data: { name: "Central Logistics", currency: "INR" },
+    isLoading: false,
+  }),
+}));
+
 describe("App routing", () => {
-  it("renders landing page on root", () => {
+  it("renders landing page on root", async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/"]}>
@@ -26,10 +69,12 @@ describe("App routing", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByText(/Physical Inventory/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Predictive Demand Engine/i, {}, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 
-  it("renders dashboard on /dashboard", () => {
+  it("renders dashboard on /dashboard", async () => {
     render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter initialEntries={["/dashboard"]}>
@@ -37,7 +82,9 @@ describe("App routing", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
-    expect(screen.getByRole("heading", { name: /Dashboard/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /Dashboard/i }, { timeout: 5000 }),
+    ).toBeInTheDocument();
   });
 
   it("shows 404 for unknown routes", () => {

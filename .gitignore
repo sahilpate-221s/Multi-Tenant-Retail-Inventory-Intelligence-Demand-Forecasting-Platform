@@ -12,3 +12,5 @@ venv/
 coverage/
 .vscode/*
 !.vscode/extensions.json
+.env.production.example
+.env.example
