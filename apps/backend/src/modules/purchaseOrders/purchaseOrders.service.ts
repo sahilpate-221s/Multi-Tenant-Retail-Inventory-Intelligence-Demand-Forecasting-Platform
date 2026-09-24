@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../db/client";
-import { purchaseOrders, products, inventory, inventoryMovements } from "../../db/schema";
+import { purchaseOrders, products, inventory, inventoryMovements, suppliers } from "../../db/schema";
 import type { CreatePurchaseOrderInput } from "./purchaseOrders.schema";
 
 export class PurchaseOrderError extends Error {
@@ -37,13 +37,20 @@ export async function listPurchaseOrders(storeId: string) {
       id: purchaseOrders.id,
       productId: purchaseOrders.productId,
       productName: products.name,
+      productSku: products.sku,
+      supplierId: purchaseOrders.supplierId,
+      supplierName: suppliers.name,
+      supplierPhone: suppliers.contactPhone,
+      supplierEmail: suppliers.contactEmail,
       quantity: purchaseOrders.quantity,
       expectedArrivalDate: purchaseOrders.expectedArrivalDate,
       status: purchaseOrders.status,
       createdAt: purchaseOrders.createdAt,
+      receivedAt: purchaseOrders.receivedAt,
     })
     .from(purchaseOrders)
     .innerJoin(products, eq(purchaseOrders.productId, products.id))
+    .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
     .where(eq(purchaseOrders.storeId, storeId))
     .orderBy(desc(purchaseOrders.createdAt));
 }

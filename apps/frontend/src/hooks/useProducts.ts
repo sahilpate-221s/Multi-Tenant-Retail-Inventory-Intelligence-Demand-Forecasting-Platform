@@ -23,6 +23,15 @@ export function useProducts(params: ProductListParams) {
   });
 }
 
+export function useProduct(id: string | null | undefined) {
+  return useQuery({
+    queryKey: ["products", id],
+    queryFn: () => apiClient.get<Product>(`/api/products/${id}`),
+    enabled: Boolean(id),
+  });
+}
+
+
 
 
 export function useCreateProduct() {

@@ -22,6 +22,11 @@ export function useUpdateRecommendationStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: "ordered" | "dismissed" }) =>
       apiClient.patch(`/api/recommendations/${id}/status`, { status }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["recommendations"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recommendations"] });
+      queryClient.invalidateQueries({ queryKey: ["purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["stockout-risks"] });
+    },
   });
-}
+}

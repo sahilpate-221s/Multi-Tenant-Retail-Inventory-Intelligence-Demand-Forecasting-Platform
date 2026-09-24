@@ -35,9 +35,11 @@ function RecommendationCard({ rec }: { rec: Recommendation }) {
         <div className="flex items-center gap-2 shrink-0 font-mono text-xs">
           <button
             onClick={() => updateStatus.mutate({ id: rec.id, status: "ordered" })}
-            className="px-3 py-1.5 rounded-lg bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] font-semibold transition-all shadow-sm active:scale-95"
+            disabled={updateStatus.isPending}
+            className="px-3.5 py-1.5 rounded-lg bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] font-semibold transition-all shadow-sm active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+            title="Auto-generates a Purchase Order and tracks inbound stock"
           >
-            Mark Ordered
+            <span>{updateStatus.isPending ? "Issuing PO..." : "Issue PO & Order"}</span>
           </button>
           <button
             onClick={() => updateStatus.mutate({ id: rec.id, status: "dismissed" })}

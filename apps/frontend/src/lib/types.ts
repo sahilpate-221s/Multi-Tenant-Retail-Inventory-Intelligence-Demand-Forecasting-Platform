@@ -417,3 +417,28 @@ export interface CreateSaleInput {
   }[];
   notes?: string;
 }
+
+// ── Purchase Orders ──
+
+export interface PurchaseOrder {
+  id: string;
+  productId: string;
+  productName: string;
+  productSku?: string;
+  supplierId?: string | null;
+  supplierName?: string | null;
+  supplierPhone?: string | null;
+  supplierEmail?: string | null;
+  quantity: number;
+  expectedArrivalDate: string;
+  status: "pending" | "received" | "cancelled";
+  createdAt: string;
+  receivedAt?: string | null;
+}
+
+export interface CreatePurchaseOrderInput {
+  productId: string;
+  supplierId?: string;
+  quantity: number;
+  expectedArrivalDate: string;
+}

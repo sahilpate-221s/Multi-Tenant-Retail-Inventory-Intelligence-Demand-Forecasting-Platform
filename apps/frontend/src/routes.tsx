@@ -9,6 +9,7 @@ const ProductDetailPage = lazy(() => import("./pages/ProductDetailPage"));
 const InventoryPage = lazy(() => import("./pages/InventoryPage"));
 const BulkRestockPage = lazy(() => import("./pages/BulkRestockPage"));
 const SuppliersPage = lazy(() => import("./pages/SuppliersPage"));
+const PurchaseOrdersPage = lazy(() => import("./pages/PurchaseOrdersPage"));
 const PlaceholderPage = lazy(() => import("./pages/PlaceholderPage"));
 const ImportPage = lazy(() => import("./pages/ImportPage"));
 const ImportDetailPage = lazy(() => import("./pages/ImportDetailPage"));
@@ -34,6 +35,7 @@ export const routes: RouteObject[] = [
   { path: "/inventory", element: <InventoryPage /> },
   { path: "/inventory/bulk-restock", element: <BulkRestockPage /> },
   { path: "/suppliers", element: <SuppliersPage /> },
+  { path: "/purchase-orders", element: <PurchaseOrdersPage /> },
   {
     path: "/inventory/at-risk",
     element: <PlaceholderPage title="Inventory At Risk" phase="Phase 4" />,

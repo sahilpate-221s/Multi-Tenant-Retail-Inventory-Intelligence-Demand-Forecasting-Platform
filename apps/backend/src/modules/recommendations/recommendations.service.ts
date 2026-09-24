@@ -1,6 +1,6 @@
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "../../db/client";
-import { products, reorderRecommendations } from "../../db/schema";
+import { products, reorderRecommendations, purchaseOrders, supplierProducts } from "../../db/schema";
 import { getInventoryIntelligence } from "../intelligence/intelligence.service";
 
 export async function generateRecommendations(storeId: string) {
@@ -91,10 +91,47 @@ export async function updateRecommendationStatus(
   recommendationId: string,
   status: "ordered" | "dismissed",
 ) {
+  const existingRec = await db.query.reorderRecommendations.findFirst({
+    where: and(
+      eq(reorderRecommendations.id, recommendationId),
+      eq(reorderRecommendations.storeId, storeId),
+    ),
+  });
+  if (!existingRec) return null;
+
   const [updated] = await db
     .update(reorderRecommendations)
     .set({ status, resolvedAt: new Date() })
     .where(and(eq(reorderRecommendations.id, recommendationId), eq(reorderRecommendations.storeId, storeId)))
     .returning();
-  return updated ?? null;
+
+  let createdPo = null;
+  if (status === "ordered" && existingRec) {
+    const supplierLink = await db
+      .select({ supplierId: supplierProducts.supplierId, leadTimeDays: supplierProducts.leadTimeDays })
+      .from(supplierProducts)
+      .where(eq(supplierProducts.productId, existingRec.productId))
+      .limit(1);
+
+    const leadTime = existingRec.leadTimeDays ?? supplierLink[0]?.leadTimeDays ?? 3;
+    const expectedArrival = new Date();
+    expectedArrival.setDate(expectedArrival.getDate() + leadTime);
+    const expectedArrivalStr = expectedArrival.toISOString().split("T")[0];
+
+    const [po] = await db
+      .insert(purchaseOrders)
+      .values({
+        storeId,
+        productId: existingRec.productId,
+        supplierId: supplierLink[0]?.supplierId ?? null,
+        quantity: existingRec.recommendedQuantity,
+        expectedArrivalDate: expectedArrivalStr,
+        status: "pending",
+      })
+      .returning();
+
+    createdPo = po;
+  }
+
+  return updated ? { ...updated, purchaseOrder: createdPo } : null;
 }
