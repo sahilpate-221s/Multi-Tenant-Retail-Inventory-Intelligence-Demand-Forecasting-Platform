@@ -8,6 +8,9 @@ export const createProductSchema = z.object({
   costPrice: z.number().nonnegative(),
   sellingPrice: z.number().nonnegative(),
   isActive: z.boolean().optional(),
+  initialStock: z.number().int().nonnegative().optional(),
+  minStock: z.number().int().nonnegative().optional(),
+  supplierId: z.string().uuid().optional().nullable(),
 });
 
 export const updateProductSchema = createProductSchema.partial();

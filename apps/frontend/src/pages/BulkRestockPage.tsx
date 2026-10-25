@@ -78,6 +78,26 @@ function BulkRestockPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  function downloadSampleCsv(type: "name" | "sku") {
+    let content = "";
+    let filename = "";
+    if (type === "name") {
+      content = "product,quantity\nMaggi 2-Minute Noodles 70g,200\nCoca-Cola Original 750ml,150\nTata Salt 1kg,100\nAashirvaad Shudh Chakki Atta 5kg,50\nParle-G Gold Biscuits 1kg,80\n";
+      filename = "stockpilot_restock_sample_by_name.csv";
+    } else {
+      content = "sku,quantity\nMAG-70G-01,200\nBEV-COKE-750,150\nGROC-SALT-1K,100\nATTA-AASH-5K,50\nPARLE-G-1K,80\n";
+      filename = "stockpilot_restock_sample_by_sku.csv";
+    }
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   const totalAccepted = preview ? preview.validRows.length + preview.warnings.length : 0;
 
   return (
@@ -97,7 +117,24 @@ function BulkRestockPage() {
 
       {/* CSV Format Help */}
       <div className="mt-4 p-4 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#121216]/60">
-        <p className="text-[10px] uppercase tracking-wider text-[#97979d] font-bold mb-2">ACCEPTED CSV FORMATS</p>
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <p className="text-[10px] uppercase tracking-wider text-[#97979d] font-bold">ACCEPTED CSV FORMATS</p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => downloadSampleCsv("name")}
+              className="text-[11px] text-[#d4a853] hover:underline flex items-center gap-1 font-semibold"
+            >
+              ⬇ Sample (by Name)
+            </button>
+            <span className="text-white/20">|</span>
+            <button
+              onClick={() => downloadSampleCsv("sku")}
+              className="text-[11px] text-[#d4a853] hover:underline flex items-center gap-1 font-semibold"
+            >
+              ⬇ Sample (by SKU)
+            </button>
+          </div>
+        </div>
         <div className="flex flex-col sm:flex-row gap-4 text-xs text-[#97979d]">
           <div className="flex-1">
             <p className="text-[#e8e6e3] font-semibold mb-1">By Product Name:</p>

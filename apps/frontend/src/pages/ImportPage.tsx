@@ -50,19 +50,46 @@ function ImportPage() {
     }
   }
 
+  function downloadSampleSalesCsv() {
+    const content =
+      "date,product,quantity,unitPrice\n" +
+      "2026-03-20T10:30:00Z,Maggi 2-Minute Noodles 70g,10,14.00\n" +
+      "2026-03-20T11:15:00Z,Coca-Cola Original 750ml,5,40.00\n" +
+      "2026-03-20T14:45:00Z,Tata Salt 1kg,12,28.00\n" +
+      "2026-03-21T09:20:00Z,Aashirvaad Shudh Chakki Atta 5kg,4,260.00\n" +
+      "2026-03-21T16:00:00Z,Parle-G Gold Biscuits 1kg,15,120.00\n";
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "stockpilot_sales_sample.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto font-mono">
       {/* Header */}
-      <div>
-        <span className="text-[10px] uppercase tracking-widest text-[#d4a853]">
-          INGESTION PIPELINE
-        </span>
-        <h1 className="text-xl md:text-2xl font-bold text-[#e8e6e3] mt-0.5">
-          Bulk Sales & Telemetry Ingestion
-        </h1>
-        <p className="mt-1 text-xs text-[#97979d]">
-          Upload standard ERP ledger export CSV (columns: date, product, quantity, unitPrice).
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <span className="text-[10px] uppercase tracking-widest text-[#d4a853]">
+            INGESTION PIPELINE
+          </span>
+          <h1 className="text-xl md:text-2xl font-bold text-[#e8e6e3] mt-0.5">
+            Bulk Sales & Telemetry Ingestion
+          </h1>
+          <p className="mt-1 text-xs text-[#97979d]">
+            Upload standard ERP ledger export CSV (columns: date, product, quantity, unitPrice).
+          </p>
+        </div>
+
+        <button
+          onClick={downloadSampleSalesCsv}
+          className="self-start sm:self-center px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#1a1a24] hover:bg-[#242432] text-[#d4a853] border border-[#d4a853]/30 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
+        >
+          ⬇ Download Sample CSV Template
+        </button>
       </div>
 
       {/* File Upload Box */}

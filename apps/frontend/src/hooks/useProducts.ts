@@ -45,9 +45,15 @@ export function useCreateProduct() {
       costPrice: number;
       sellingPrice: number;
       isActive?: boolean;
+      initialStock?: number;
+      minStock?: number;
+      supplierId?: string | null;
     }) => apiClient.post<Product>("/api/products", input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["stockout-risks"] });
     },
   });
 }

@@ -19,6 +19,9 @@ Traditional inventory software only answers: *"What do I have?"*
 
 ## 📑 Table of Contents
 
+- [🌟 Shopkeeper Guide & Feature Manual (Hinglish)](docs/product/SHOPKEEPER_COMPLETE_FLOW_AND_OPTIONS_GUIDE.md)
+- [🚨 Brutal Honest Audit & Missing Things](docs/AUDIT_AND_MISSING_THINGS_BRUTAL_HONESTY.md)
+- [🎯 Master Interview Preparation & Architecture Guide](docs/INTERVIEW_PREPARATION_GUIDE.md)
 - [Key Architectural Highlights](#-key-architectural-highlights)
 - [System Architecture & Monorepo](#-system-architecture--monorepo)
 - [Core Feature Modules](#-core-feature-modules)
@@ -383,6 +386,11 @@ pytest
 ---
 
 ## 📚 Project Documentation Catalog
+
+### 🌟 Practical User & Interview Guides
+- [Shopkeeper Complete Flow & Feature Manual (Hinglish)](docs/product/SHOPKEEPER_COMPLETE_FLOW_AND_OPTIONS_GUIDE.md) — Daily workflow (Morning to Night), screen-by-screen breakdown, and beginner shopkeeper guide.
+- [Brutal Honest Audit & Missing Things Guide](docs/AUDIT_AND_MISSING_THINGS_BRUTAL_HONESTY.md) — Transparent assessment of technical gaps, user friction points, and prioritized P0/P1/P2 roadmap.
+- [Master Interview Preparation Guide](docs/INTERVIEW_PREPARATION_GUIDE.md) — Comprehensive technical guide with elevator pitch, tech stack justifications, 25 Q&As, and ChatGPT mock interview prompts.
 
 ### 🏛 Architecture & Engineering
 - [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) — Topology, component roles, and interaction diagrams.

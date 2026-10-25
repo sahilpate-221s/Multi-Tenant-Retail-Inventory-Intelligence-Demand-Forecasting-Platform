@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useProducts, useCategories, useDeleteProduct } from "../hooks/useProducts";
 import type { Product, ProductListParams } from "../lib/types";
@@ -17,6 +17,18 @@ function ProductsListPage() {
   const [page, setPage] = useState(1);
   const [editingProduct, setEditingProduct] = useState<Product | null | undefined>(undefined);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".actions-menu-container")) {
+        setOpenActionId(null);
+      }
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, []);
 
   const { data: categories } = useCategories();
   const { data, isLoading, isError, refetch } = useProducts({
@@ -39,6 +51,91 @@ function ProductsListPage() {
     }
   }
 
+  const handlePrintShelfLabels = () => {
+    const productsToPrint = data?.items || [];
+    if (productsToPrint.length === 0) {
+      alert("No products found to print labels for.");
+      return;
+    }
+
+    const printWin = window.open("", "_blank");
+    if (!printWin) return;
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Shelf Barcode Labels - StockPilot</title>
+          <style>
+            @page { size: auto; margin: 8mm; }
+            body { font-family: monospace; margin: 0; padding: 10px; background: #fff; color: #000; }
+            .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+            .label-card {
+              border: 1.5px dashed #333;
+              padding: 8px;
+              border-radius: 4px;
+              text-align: center;
+              page-break-inside: avoid;
+              background: #fff;
+            }
+            .store-header { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #555; }
+            .item-name { font-size: 11px; font-weight: bold; margin: 4px 0 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .mrp-row { display: flex; justify-content: space-between; align-items: baseline; margin: 4px 0; padding: 2px 4px; background: #f0f0f0; border-radius: 2px; }
+            .mrp-val { font-size: 13px; font-weight: bold; }
+            .sku-val { font-size: 9px; color: #444; }
+            .barcode-visual {
+              font-family: monospace;
+              font-size: 18px;
+              letter-spacing: 2px;
+              margin-top: 4px;
+              line-height: 1;
+              color: #111;
+            }
+            .barcode-digits { font-size: 9px; letter-spacing: 1px; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="grid">
+            ${productsToPrint.map((p) => `
+              <div class="label-card">
+                <div class="store-header">StockPilot Retail</div>
+                <div class="item-name" title="${p.name}">${p.name}</div>
+                <div class="mrp-row">
+                  <span class="mrp-val">₹${Number(p.sellingPrice).toFixed(2)}</span>
+                  <span class="sku-val">${p.sku}</span>
+                </div>
+                <div class="barcode-visual">|| | ||| || ||| | |||</div>
+                <div class="barcode-digits">${p.barcode || p.sku}</div>
+              </div>
+            `).join("")}
+          </div>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+    printWin.focus();
+    printWin.print();
+  };
+
+  const handleDownloadCatalogTemplate = () => {
+    const csvContent =
+      "Name,SKU,Barcode,Category,CostPrice,SellingPrice,InitialStock,SupplierName\n" +
+      '"Tata Tea Premium 500g","TEA-TAT-500","8901052002345","Beverages",140.00,175.00,50,"Tata Consumer Products"\n' +
+      '"Parle-G Gold Biscuits 1kg","PAR-GLD-1K","8901719102031","Biscuits",65.00,80.00,75,"Parle Distributor"\n' +
+      '"Fortune Sunlite Sunflower Oil 1L","OIL-FRT-01L","8906007281014","Edible Oils",125.00,150.00,40,"Adani Wilmar"\n' +
+      '"Dettol Original Soap 125g","SOAP-DET-125","8901396328701","Personal Care",38.00,45.00,100,"Reckitt Benckiser"\n';
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", "stockpilot_catalog_starter_template.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
       {/* Header Bar */}
@@ -52,12 +149,26 @@ function ProductsListPage() {
           </h1>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleDownloadCatalogTemplate}
+            className="text-xs font-mono px-3 py-2 border border-white/10 bg-[#16161d] hover:bg-[#1f1f28] rounded-lg text-[#97979d] hover:text-[#e8e6e3] transition-all flex items-center gap-1.5"
+            title="Download Starter CSV Template"
+          >
+            <span>📥 Starter CSV</span>
+          </button>
+          <button
+            onClick={handlePrintShelfLabels}
+            className="text-xs font-mono px-3 py-2 border border-white/10 bg-[#16161d] hover:bg-[#1f1f28] rounded-lg text-[#e8e6e3] hover:border-[#d4a853]/40 transition-all flex items-center gap-1.5"
+            title="Print Shelf Barcode & Price Tags"
+          >
+            <span>🖨️ Shelf Labels</span>
+          </button>
           <button
             onClick={() => setShowCategoryManager(true)}
-            className="text-xs font-mono px-3.5 py-2 border border-[rgba(255,255,255,0.08)] bg-[#1a1a22] hover:bg-[#22222c] hover:border-[rgba(212,168,83,0.3)] rounded-lg text-[#e8e6e3] transition-all"
+            className="text-xs font-mono px-3 py-2 border border-white/8 bg-[#1a1a22] hover:bg-[#22222c] rounded-lg text-[#e8e6e3] transition-all"
           >
-            Manage Categories
+            Categories
           </button>
           <button
             onClick={() => setEditingProduct(null)}
@@ -126,7 +237,7 @@ function ProductsListPage() {
                     Product Name {sortBy === "name" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th className="px-5 py-3 cursor-pointer select-none hover:text-[#e8e6e3]" onClick={() => toggleSort("sku")}>
-                    SKU Code {sortBy === "sku" && (sortOrder === "asc" ? "↑" : "↓")}
+                    Item Code / SKU {sortBy === "sku" && (sortOrder === "asc" ? "↑" : "↓")}
                   </th>
                   <th className="px-5 py-3 cursor-pointer select-none hover:text-[#e8e6e3]" onClick={() => toggleSort("sellingPrice")}>
                     Price {sortBy === "sellingPrice" && (sortOrder === "asc" ? "↑" : "↓")}
@@ -158,19 +269,62 @@ function ProductsListPage() {
                         {product.isActive ? "ACTIVE" : "INACTIVE"}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => setEditingProduct(product)}
-                        className="text-xs text-[#97979d] hover:text-[#d4a853] transition-colors mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => { if (confirm(`Delete ${product.name}?`)) deleteProduct.mutate(product.id); }}
-                        className="text-xs text-[#d45a4a] hover:text-red-400 transition-colors"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-5 py-3.5 text-right relative actions-menu-container">
+                      <div className="relative inline-block text-left">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionId(openActionId === product.id ? null : product.id);
+                          }}
+                          className={`px-2.5 py-1 text-xs rounded-md border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                            openActionId === product.id
+                              ? "bg-[#20202e] border-[#d4a853]/60 text-[#e8e6e3]"
+                              : "bg-[#16161f] border-white/10 text-[#97979d] hover:text-[#e8e6e3] hover:border-white/20"
+                          }`}
+                        >
+                          <span>Actions</span>
+                          <svg className={`w-3 h-3 transition-transform ${openActionId === product.id ? "rotate-180 text-[#d4a853]" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {openActionId === product.id && (
+                          <div className="absolute right-0 mt-1 w-36 bg-[#181824] border border-white/10 rounded-lg shadow-2xl py-1 z-30 divide-y divide-white/5 animate-in fade-in duration-100">
+                            <div className="py-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  setEditingProduct(product);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-[#e8e6e3] hover:bg-[#222232] hover:text-[#d4a853] flex items-center gap-2 cursor-pointer transition-colors"
+                              >
+                                <span>✏️ Edit</span>
+                              </button>
+                              <Link
+                                to={`/products/${product.id}`}
+                                onClick={() => setOpenActionId(null)}
+                                className="w-full text-left px-3 py-1.5 text-xs text-[#b4b4bc] hover:bg-[#222232] hover:text-[#e8e6e3] flex items-center gap-2 cursor-pointer transition-colors block"
+                              >
+                                <span>🔍 Details</span>
+                              </Link>
+                            </div>
+                            <div className="py-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  if (confirm(`Delete ${product.name}?`)) deleteProduct.mutate(product.id);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer transition-colors"
+                              >
+                                <span>🗑️ Delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

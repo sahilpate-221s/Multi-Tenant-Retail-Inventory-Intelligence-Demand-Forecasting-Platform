@@ -34,7 +34,7 @@ function AdjustStockModal({ item, onClose }: { item: InventoryItem; onClose: () 
       <div className="bg-[#141418] border border-[rgba(255,255,255,0.12)] rounded-xl w-full max-w-sm p-6 shadow-2xl font-mono text-xs text-[#e8e6e3]">
         <div className="flex items-center justify-between pb-3 border-b border-[rgba(255,255,255,0.06)]">
           <h2 className="font-bold text-sm text-[#e8e6e3]">Adjust Stock</h2>
-          <button onClick={onClose} className="text-[#97979d] hover:text-[#e8e6e3]">✕</button>
+          <button onClick={onClose} className="text-[#97979d] hover:text-[#e8e6e3] cursor-pointer">✕</button>
         </div>
 
         <p className="text-xs text-[#97979d] mt-3 truncate">{item.productName}</p>
@@ -43,7 +43,7 @@ function AdjustStockModal({ item, onClose }: { item: InventoryItem; onClose: () 
         <div className="mt-4 flex gap-2">
           <button
             onClick={() => setDirection("add")}
-            className={`flex-1 text-xs py-2 rounded-lg border font-semibold transition-all ${
+            className={`flex-1 text-xs py-2 rounded-lg border font-semibold transition-all cursor-pointer ${
               direction === "add"
                 ? "bg-[#4aba7a]/15 border-[#4aba7a] text-[#4aba7a]"
                 : "border-[rgba(255,255,255,0.08)] text-[#97979d] hover:text-[#e8e6e3]"
@@ -53,7 +53,7 @@ function AdjustStockModal({ item, onClose }: { item: InventoryItem; onClose: () 
           </button>
           <button
             onClick={() => setDirection("remove")}
-            className={`flex-1 text-xs py-2 rounded-lg border font-semibold transition-all ${
+            className={`flex-1 text-xs py-2 rounded-lg border font-semibold transition-all cursor-pointer ${
               direction === "remove"
                 ? "bg-[#d45a4a]/15 border-[#d45a4a] text-[#d45a4a]"
                 : "border-[rgba(255,255,255,0.08)] text-[#97979d] hover:text-[#e8e6e3]"
@@ -74,7 +74,7 @@ function AdjustStockModal({ item, onClose }: { item: InventoryItem; onClose: () 
         <select
           value={reason}
           onChange={(e) => setReason(e.target.value as typeof reason)}
-          className="w-full mt-3 bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none transition-colors"
+          className="w-full mt-3 bg-[#0a0a0c] border border-[rgba(255,255,255,0.1)] focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none transition-colors cursor-pointer"
         >
           {REASONS.map((r) => (
             <option key={r} value={r} className="bg-[#121216] text-[#e8e6e3]">
@@ -95,14 +95,14 @@ function AdjustStockModal({ item, onClose }: { item: InventoryItem; onClose: () 
         <div className="flex justify-end gap-2 mt-5 pt-3 border-t border-[rgba(255,255,255,0.06)]">
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-[#97979d] hover:text-[#e8e6e3] hover:bg-[#1a1a22] transition-colors"
+            className="px-3 py-1.5 rounded-lg text-[#97979d] hover:text-[#e8e6e3] hover:bg-[#1a1a22] transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={adjustStock.isPending}
-            className="bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] font-semibold px-4 py-1.5 rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50"
+            className="bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] font-semibold px-4 py-1.5 rounded-lg transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
           >
             {adjustStock.isPending ? "Committing..." : "Commit Ledger"}
           </button>

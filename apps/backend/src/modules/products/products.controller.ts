@@ -3,6 +3,7 @@ import { createProductSchema, updateProductSchema, listProductsQuerySchema } fro
 import {
   listProducts,
   getProductById,
+  getProductByBarcode,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -28,6 +29,18 @@ export async function getProduct(req: Request, res: Response) {
   const product = await getProductById(req.auth!.storeId, req.params.id as string);
   if (!product) {
     return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
+  }
+  return res.status(200).json({ success: true, data: product });
+}
+
+export async function getProductByBarcodeHandler(req: Request, res: Response) {
+  const code = req.params.barcode as string;
+  if (!code) {
+    return res.status(400).json({ success: false, error: { code: "BAD_REQUEST", message: "Barcode or code is required." } });
+  }
+  const product = await getProductByBarcode(req.auth!.storeId, code);
+  if (!product) {
+    return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: `Product with barcode or SKU '${code}' not found.` } });
   }
   return res.status(200).json({ success: true, data: product });
 }

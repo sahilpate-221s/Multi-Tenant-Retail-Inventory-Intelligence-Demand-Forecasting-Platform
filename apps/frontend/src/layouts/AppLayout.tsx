@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef, Suspense } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/authContext";
 import { useStoreSettings } from "../hooks/useSettings";
@@ -22,8 +22,13 @@ const navSections = [
   {
     label: "OPERATIONS",
     items: [
-      { to: "/sales", label: "Sales" },
+      { to: "/pos", label: "Counter Billing" },
+      { to: "/sales", label: "Sales & Orders" },
+      { to: "/perishables", label: "Expiry & Batches" },
+      { to: "/audits", label: "Stock Audits" },
       { to: "/purchase-orders", label: "Purchase Orders" },
+      { to: "/khata", label: "Customer Khata" },
+      { to: "/vendor-khata", label: "Vendor Khata" },
       { to: "/import", label: "Import" },
       { to: "/inventory/bulk-restock", label: "Bulk Restock" },
     ],
@@ -31,6 +36,7 @@ const navSections = [
   {
     label: "INTELLIGENCE",
     items: [
+      { to: "/inventory/at-risk", label: "At-Risk Sentinel" },
       { to: "/forecasts", label: "Forecasts" },
       { to: "/stockout-risks", label: "Stockout Risk" },
       { to: "/reorder-recommendations", label: "Reorder" },
@@ -56,6 +62,69 @@ function AppLayout() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cashier Mode State (locks down store margins & intelligence from clerks)
+  const [isCashierMode, setIsCashierMode] = useState<boolean>(() => {
+    return localStorage.getItem("sp_cashier_mode") === "true";
+  });
+  const [showPinModal, setShowPinModal] = useState(false);
+  const [enteredPin, setEnteredPin] = useState("");
+  const [pinError, setPinError] = useState("");
+
+  const handleToggleCashier = (enable: boolean) => {
+    if (enable) {
+      localStorage.setItem("sp_cashier_mode", "true");
+      setIsCashierMode(true);
+      window.dispatchEvent(new Event("cashier-mode-changed"));
+      navigate("/pos");
+    } else {
+      setShowPinModal(true);
+      setEnteredPin("");
+      setPinError("");
+    }
+  };
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (enteredPin === "1234") {
+      localStorage.setItem("sp_cashier_mode", "false");
+      setIsCashierMode(false);
+      window.dispatchEvent(new Event("cashier-mode-changed"));
+      setShowPinModal(false);
+      setEnteredPin("");
+      setPinError("");
+    } else {
+      setPinError("Incorrect PIN. Default Store Owner PIN is 1234");
+    }
+  };
+
+  const displayedNavSections = useMemo(() => {
+    if (!isCashierMode) return navSections;
+    return [
+      {
+        label: "COUNTER OPERATIONS",
+        items: [
+          { to: "/pos", label: "Counter Billing" },
+          { to: "/sales", label: "Past Sales Ledger" },
+          { to: "/khata", label: "Customer Khata" },
+        ],
+      },
+      {
+        label: "STORE LOOKUP",
+        items: [
+          { to: "/inventory", label: "Shelf Stock Check" },
+          { to: "/perishables", label: "Expiry & Batches" },
+          { to: "/audits", label: "Stock Audits" },
+        ],
+      },
+      {
+        label: "SYSTEM",
+        items: [
+          { to: "/notifications", label: "Notifications" },
+        ],
+      },
+    ];
+  }, [isCashierMode]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -215,7 +284,7 @@ function AppLayout() {
 
         {/* Navigation (Independently scrollable up and down) */}
         <nav className="flex-1 overflow-y-auto overscroll-contain py-3 px-3">
-          {navSections.map((section) => (
+          {displayedNavSections.map((section) => (
             <div key={section.label} className="mb-4">
               <p
                 className="px-2 mb-1"
@@ -298,6 +367,19 @@ function AppLayout() {
               </div>
             </div>
           </div>
+
+          {/* Middle: Cashier Mode Active Banner */}
+          {isCashierMode && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-[#d4a853]/15 border border-[#d4a853]/35 text-[#d4a853] text-xs font-mono font-bold animate-pulse">
+              <span>🔒 Cashier Counter Mode</span>
+              <button
+                onClick={() => handleToggleCashier(false)}
+                className="text-[10px] bg-[#d4a853] text-[#0c0c0e] px-2 py-0.5 rounded font-bold hover:bg-[#e8be66] transition-all ml-1 shadow-sm"
+              >
+                Unlock Owner
+              </button>
+            </div>
+          )}
 
           {/* Right: Notifications + Settings Dropdown Action Button */}
           <div className="flex items-center gap-3">
@@ -385,6 +467,25 @@ function AppLayout() {
                         <div className="text-[10px] text-[#71717a]">Buffer days & auto-reorder rules</div>
                       </div>
                     </button>
+
+                    {/* Cashier Mode Quick Toggle Button */}
+                    <button
+                      onClick={() => {
+                        setSettingsOpen(false);
+                        handleToggleCashier(!isCashierMode);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left"
+                    >
+                      <span className="text-base">{isCashierMode ? "🔑" : "🔒"}</span>
+                      <div className="flex-1">
+                        <div className="font-semibold text-xs">
+                          {isCashierMode ? "Unlock Owner Mode" : "Switch to Cashier Mode"}
+                        </div>
+                        <div className="text-[10px] text-[#71717a]">
+                          {isCashierMode ? "Enter PIN to access full store analytics" : "Lock counter to POS & hide cost margins"}
+                        </div>
+                      </div>
+                    </button>
                   </div>
 
                   {/* Divider */}
@@ -435,6 +536,69 @@ function AppLayout() {
           </div>
         </main>
       </div>
+
+      {/* Owner Mode Security PIN Verification Modal */}
+      {showPinModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 px-4 font-mono">
+          <div className="bg-[#141418] border border-white/10 rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in fade-in">
+            <div className="flex items-center justify-between pb-3 border-b border-white/6">
+              <h2 className="font-bold text-sm text-[#e8e6e3] flex items-center gap-2">
+                <span>🔑</span> Unlock Store Owner Mode
+              </h2>
+              <button
+                onClick={() => setShowPinModal(false)}
+                className="text-[#97979d] hover:text-[#e8e6e3]"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handlePinSubmit} className="mt-4 space-y-3">
+              <p className="text-xs text-[#97979d]">
+                Enter Store Owner PIN to restore executive dashboards, profit margins, and procurement controls.
+              </p>
+
+              <div>
+                <label className="text-[10px] text-[#71717a] uppercase block mb-1">
+                  SECURITY PIN (DEFAULT: 1234)
+                </label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  autoFocus
+                  required
+                  value={enteredPin}
+                  onChange={(e) => setEnteredPin(e.target.value)}
+                  placeholder="••••"
+                  className="w-full bg-[#0a0a0d] border border-white/15 focus:border-[#d4a853] rounded-lg px-3 py-2 text-center text-lg tracking-widest text-[#e8e6e3] outline-none"
+                />
+              </div>
+
+              {pinError && (
+                <p className="text-xs text-[#d45a4a] bg-[#d45a4a]/10 p-2 rounded border border-[#d45a4a]/25">
+                  {pinError}
+                </p>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-white/6">
+                <button
+                  type="button"
+                  onClick={() => setShowPinModal(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs text-[#97979d] hover:text-[#e8e6e3]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] font-bold text-xs px-4 py-1.5 rounded-lg transition-all shadow-md active:scale-95"
+                >
+                  Verify & Unlock
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

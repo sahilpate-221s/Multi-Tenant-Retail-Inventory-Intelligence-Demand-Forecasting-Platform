@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSuppliers, useDeleteSupplier } from "../hooks/useSuppliers";
 import type { Supplier } from "../lib/types";
 import LoadingState from "../components/states/LoadingState";
@@ -10,6 +10,18 @@ function SuppliersPage() {
   const { data: suppliers, isLoading, isError, refetch } = useSuppliers();
   const deleteSupplier = useDeleteSupplier();
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null | undefined>(undefined);
+  const [openActionId, setOpenActionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".actions-menu-container")) {
+        setOpenActionId(null);
+      }
+    };
+    document.addEventListener("click", handleOutsideClick);
+    return () => document.removeEventListener("click", handleOutsideClick);
+  }, []);
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto">
@@ -49,7 +61,8 @@ function SuppliersPage() {
                 <tr>
                   <th className="px-5 py-3">Vendor / Entity</th>
                   <th className="px-5 py-3">Dispatch Contact Email</th>
-                  <th className="px-5 py-3">Phone Channel</th>
+                  <th className="px-5 py-3">WhatsApp & Phone</th>
+                  <th className="px-5 py-3">Notes & Terms</th>
                   <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -60,20 +73,73 @@ function SuppliersPage() {
                       {s.name}
                     </td>
                     <td className="px-5 py-3.5 text-[#97979d]">{s.contactEmail || "—"}</td>
-                    <td className="px-5 py-3.5 text-[#97979d]">{s.contactPhone || "—"}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => setEditingSupplier(s)}
-                        className="text-xs text-[#97979d] hover:text-[#d4a853] transition-colors mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => { if (confirm(`Delete ${s.name}?`)) deleteSupplier.mutate(s.id); }}
-                        className="text-xs text-[#d45a4a] hover:text-red-400 transition-colors"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-5 py-3.5">
+                      {s.contactPhone ? (
+                        <a
+                          href={`https://wa.me/${s.contactPhone.replace(/\D/g, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#25D366] hover:underline flex items-center gap-1 font-semibold"
+                          title="Open WhatsApp chat with supplier"
+                        >
+                          <span>💬 {s.contactPhone}</span>
+                        </a>
+                      ) : (
+                        <span className="text-[#97979d]">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5 text-[#97979d] text-[11px] max-w-[200px] truncate">
+                      {s.reliabilityNotes || "Standard 3d SLA"}
+                    </td>
+                    <td className="px-5 py-3.5 text-right relative actions-menu-container">
+                      <div className="relative inline-block text-left">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenActionId(openActionId === s.id ? null : s.id);
+                          }}
+                          className={`px-2.5 py-1 text-xs rounded-md border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                            openActionId === s.id
+                              ? "bg-[#20202e] border-[#d4a853]/60 text-[#e8e6e3]"
+                              : "bg-[#16161f] border-white/10 text-[#97979d] hover:text-[#e8e6e3] hover:border-white/20"
+                          }`}
+                        >
+                          <span>Actions</span>
+                          <svg className={`w-3 h-3 transition-transform ${openActionId === s.id ? "rotate-180 text-[#d4a853]" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {openActionId === s.id && (
+                          <div className="absolute right-0 mt-1 w-36 bg-[#181824] border border-white/10 rounded-lg shadow-2xl py-1 z-30 divide-y divide-white/5 animate-in fade-in duration-100">
+                            <div className="py-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  setEditingSupplier(s);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-[#e8e6e3] hover:bg-[#222232] hover:text-[#d4a853] flex items-center gap-2 cursor-pointer transition-colors"
+                              >
+                                <span>✏️ Edit</span>
+                              </button>
+                            </div>
+                            <div className="py-0.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionId(null);
+                                  if (confirm(`Delete ${s.name}?`)) deleteSupplier.mutate(s.id);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer transition-colors"
+                              >
+                                <span>🗑️ Delete</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

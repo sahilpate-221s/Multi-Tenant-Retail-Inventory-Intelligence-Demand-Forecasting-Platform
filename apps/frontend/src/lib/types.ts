@@ -47,6 +47,7 @@ export interface Supplier {
   contactEmail: string | null;
   contactPhone: string | null;
   reliabilityNotes: string | null;
+  leadTimeDays?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -56,6 +57,10 @@ export interface InventoryItem {
   productId: string;
   productName: string;
   sku: string;
+  barcode?: string | null;
+  categoryId?: string | null;
+  costPrice?: number;
+  sellingPrice?: number;
   currentStock: number;
   minStock: number;
   safetyStock: number;
@@ -387,6 +392,7 @@ export interface Sale {
   createdAt: string;
   items: SaleLineItem[];
   totalUnits: number;
+  notes?: string | null;
   returnStatus?: "none" | "partial" | "full";
 }
 

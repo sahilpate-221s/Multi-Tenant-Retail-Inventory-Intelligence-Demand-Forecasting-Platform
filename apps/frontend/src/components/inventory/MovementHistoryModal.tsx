@@ -10,7 +10,7 @@ function MovementHistoryModal({ productId, productName, onClose }: { productId: 
       <div className="bg-[#141418] border border-[rgba(255,255,255,0.12)] rounded-xl w-full max-w-lg p-6 shadow-2xl font-mono text-xs text-[#e8e6e3]">
         <div className="flex items-center justify-between pb-3 border-b border-[rgba(255,255,255,0.06)]">
           <h2 className="font-bold text-sm text-[#e8e6e3]">Ledger Audit Trail</h2>
-          <button onClick={onClose} className="text-[#97979d] hover:text-[#e8e6e3]">✕</button>
+          <button onClick={onClose} className="text-[#97979d] hover:text-[#e8e6e3] cursor-pointer">✕</button>
         </div>
 
         <p className="text-xs text-[#d4a853] mt-2 truncate font-semibold">{productName}</p>

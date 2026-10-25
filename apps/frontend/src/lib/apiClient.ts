@@ -1,11 +1,23 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== "undefined" && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1"
+    ? `http://${window.location.hostname}:4000`
+    : "http://localhost:4000");
 
-let currentAccessToken: string | null = null;
+let currentAccessToken: string | null =
+  typeof window !== "undefined" ? localStorage.getItem("stockpilot_access_token") : null;
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
 export function setAccessTokenForClient(token: string | null) {
   currentAccessToken = token;
+  if (typeof window !== "undefined") {
+    if (token) {
+      localStorage.setItem("stockpilot_access_token", token);
+    } else {
+      localStorage.removeItem("stockpilot_access_token");
+    }
+  }
 }
 
 export class ApiError extends Error {

@@ -9,6 +9,7 @@ import {
 import { useProducts } from "../hooks/useProducts";
 import { useSuppliers } from "../hooks/useSuppliers";
 import type { PurchaseOrder, Supplier } from "../lib/types";
+import { addPerishableBatch } from "../lib/batchExpiryStorage";
 import LoadingState from "../components/states/LoadingState";
 import EmptyState from "../components/states/EmptyState";
 import ErrorState from "../components/states/ErrorState";
@@ -34,13 +35,12 @@ function formatWhatsAppText(po: PurchaseOrder, storeName: string = "StockPilot S
 
 function PurchaseOrdersPage() {
   const { data: purchaseOrders, isLoading, isError, refetch } = usePurchaseOrders();
-  const receiveMutation = useReceivePurchaseOrder();
   const cancelMutation = useCancelPurchaseOrder();
 
   const [activeTab, setActiveTab] = useState<TabFilter>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [receivingId, setReceivingId] = useState<string | null>(null);
+  const [receivingOrder, setReceivingOrder] = useState<PurchaseOrder | null>(null);
 
   const filteredOrders = (purchaseOrders || []).filter((po) => {
     const matchesTab = activeTab === "all" || po.status === activeTab;
@@ -55,15 +55,6 @@ function PurchaseOrdersPage() {
 
   const pendingCount = (purchaseOrders || []).filter((p) => p.status === "pending").length;
   const receivedCount = (purchaseOrders || []).filter((p) => p.status === "received").length;
-
-  const handleReceive = async (poId: string) => {
-    setReceivingId(poId);
-    try {
-      await receiveMutation.mutateAsync(poId);
-    } finally {
-      setReceivingId(null);
-    }
-  };
 
   const handleCancel = async (poId: string) => {
     if (confirm("Are you sure you want to cancel this purchase order?")) {
@@ -359,14 +350,13 @@ function PurchaseOrdersPage() {
                               🖨️
                             </button>
 
-                            {/* Receive Button (1-Click) */}
+                            {/* Receive Button (Delivery Verification) */}
                             {isPending && (
                               <button
-                                onClick={() => handleReceive(po.id)}
-                                disabled={receivingId === po.id}
-                                className="px-3 py-1.5 rounded-lg bg-[#4aba7a] hover:bg-[#58cf8b] text-[#0c0c0e] font-bold transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                                onClick={() => setReceivingOrder(po)}
+                                className="px-3 py-1.5 rounded-lg bg-[#4aba7a] hover:bg-[#58cf8b] text-[#0c0c0e] font-bold transition-all shadow-sm active:scale-95"
                               >
-                                {receivingId === po.id ? "Restocking..." : "Receive"}
+                                Receive
                               </button>
                             )}
 
@@ -395,6 +385,14 @@ function PurchaseOrdersPage() {
 
       {/* ─── Manual PO Creation Modal ─── */}
       {showCreateModal && <CreatePOModal onClose={() => setShowCreateModal(false)} />}
+
+      {/* ─── Inbound Delivery Receipt & Batch Verification Modal ─── */}
+      {receivingOrder && (
+        <ReceiveDeliveryModal
+          po={receivingOrder}
+          onClose={() => setReceivingOrder(null)}
+        />
+      )}
     </div>
   );
 }
@@ -547,6 +545,175 @@ function CreatePOModal({ onClose }: { onClose: () => void }) {
             >
               {createMutation.isPending ? "Creating PO..." : "Issue Purchase Order"}
             </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+/** Modal to verify incoming shipment delivery and record perishable batch/expiry */
+function ReceiveDeliveryModal({
+  po,
+  onClose,
+}: {
+  po: PurchaseOrder;
+  onClose: () => void;
+}) {
+  const receiveMutation = useReceivePurchaseOrder();
+  const storeId = localStorage.getItem("stockpilot_store_id") || "default";
+
+  const [batchNumber, setBatchNumber] = useState(`LOT-${po.id.slice(0, 6).toUpperCase()}`);
+  const [expiryDate, setExpiryDate] = useState("");
+  const [isPerishable, setIsPerishable] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleQuickReceive = async () => {
+    try {
+      await receiveMutation.mutateAsync(po.id);
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to receive shipment.");
+    }
+  };
+
+  const handleReceiveWithBatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (isPerishable && !expiryDate) {
+        setErrorMsg("Please select an expiration date for this perishable item.");
+        return;
+      }
+
+      if (expiryDate) {
+        addPerishableBatch(storeId, {
+          poId: po.id,
+          productId: po.productId,
+          productName: po.productName,
+          sku: po.productSku || "",
+          batchNumber: batchNumber || `LOT-${Date.now().toString().slice(-4)}`,
+          quantity: po.quantity,
+          expiryDate,
+        });
+      }
+
+      await receiveMutation.mutateAsync(po.id);
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to receive shipment.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-50 px-4">
+      <div className="bg-[#141418] border border-white/12 rounded-xl w-full max-w-md p-6 shadow-2xl font-mono text-xs text-[#e8e6e3]">
+        <div className="flex items-center justify-between pb-3 border-b border-white/6">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📥</span>
+            <h2 className="font-bold text-sm text-[#e8e6e3]">Verify Inbound Delivery</h2>
+          </div>
+          <button onClick={onClose} className="text-[#97979d] hover:text-[#e8e6e3]">
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-4 p-3 rounded-lg bg-[#0a0a0c] border border-white/8 space-y-1.5 text-xs">
+          <div className="flex justify-between">
+            <span className="text-[#71717a]">Order Identifier:</span>
+            <span className="font-bold text-[#e8e6e3]">PO-{po.id.slice(0, 8).toUpperCase()}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-[#71717a]">Product:</span>
+            <span className="font-bold text-[#e8e6e3]">{po.productName}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-[#71717a]">Units Inbound:</span>
+            <span className="font-bold text-[#4aba7a]">+{po.quantity} units</span>
+          </div>
+          {po.supplierName && (
+            <div className="flex justify-between">
+              <span className="text-[#71717a]">Distributor:</span>
+              <span className="text-[#97979d]">{po.supplierName}</span>
+            </div>
+          )}
+        </div>
+
+        <form onSubmit={handleReceiveWithBatch} className="mt-4 flex flex-col gap-3">
+          <div className="p-3.5 rounded-lg bg-white/3 border border-white/6 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-[#f4f4f5]">Perishable / Batch Expiry Sentinel</span>
+              <label className="flex items-center gap-1.5 cursor-pointer text-[10px] text-[#d4a853] font-semibold">
+                <input
+                  type="checkbox"
+                  checked={isPerishable}
+                  onChange={(e) => setIsPerishable(e.target.checked)}
+                  className="rounded bg-black border-white/20 accent-[#d4a853]"
+                />
+                <span>Track Batch & Expiry</span>
+              </label>
+            </div>
+
+            {isPerishable && (
+              <div className="space-y-2.5 pt-2 border-t border-white/6">
+                <div>
+                  <label className="text-[10px] uppercase text-[#71717a] block mb-1">
+                    Batch / Lot Number
+                  </label>
+                  <input
+                    type="text"
+                    value={batchNumber}
+                    onChange={(e) => setBatchNumber(e.target.value)}
+                    className="w-full bg-[#0a0a0c] border border-white/10 focus:border-[#d4a853] rounded-lg px-3 py-1.5 text-[#e8e6e3] outline-none"
+                    placeholder="e.g. LOT-2026-A1"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-[#71717a] block mb-1">
+                    Expiration Date <span className="text-[#d45a4a]">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
+                    className="w-full bg-[#0a0a0c] border border-white/10 focus:border-[#d4a853] rounded-lg px-3 py-1.5 text-[#e8e6e3] outline-none"
+                    required={isPerishable}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {errorMsg && (
+            <p className="text-[11px] text-[#d45a4a] bg-[#d45a4a]/10 border border-[#d45a4a]/30 p-2 rounded">
+              {errorMsg}
+            </p>
+          )}
+
+          <div className="pt-3 flex items-center justify-between gap-2 border-t border-white/6">
+            <button
+              type="button"
+              onClick={handleQuickReceive}
+              disabled={receiveMutation.isPending}
+              className="px-3 py-2 rounded-lg text-xs font-semibold bg-[#1a1a22] hover:bg-[#22222c] border border-white/10 text-[#97979d] hover:text-[#e8e6e3] transition-colors active:scale-95"
+            >
+              {receiveMutation.isPending ? "Receiving..." : "⚡ Quick Restock"}
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-3 py-2 rounded-lg text-xs text-[#71717a] hover:text-[#e8e6e3]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={receiveMutation.isPending}
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-[#4aba7a] hover:bg-[#58cf8b] text-[#0c0c0e] transition-all shadow-sm active:scale-95 disabled:opacity-50"
+              >
+                {receiveMutation.isPending ? "Restocking..." : "✓ Confirm & Receive"}
+              </button>
+            </div>
           </div>
         </form>
       </div>

@@ -1,6 +1,6 @@
 import { eq, and, ilike, asc, desc, sql, SQL } from "drizzle-orm";
 import { db } from "../../db/client";
-import { products, categories, inventory } from "../../db/schema";
+import { products, categories, inventory, inventoryMovements, supplierProducts, suppliers } from "../../db/schema";
 import type { CreateProductInput, UpdateProductInput, ListProductsQuery } from "./products.schema";
 
 export class ProductError extends Error {
@@ -68,6 +68,23 @@ export async function getProductById(storeId: string, productId: string) {
   });
 }
 
+export async function getProductByBarcode(storeId: string, code: string) {
+  const trimmed = code.trim();
+  // Try exact barcode match first
+  let product = await db.query.products.findFirst({
+    where: and(eq(products.barcode, trimmed), eq(products.storeId, storeId)),
+  });
+
+  // If not found by barcode, try SKU (case-insensitive)
+  if (!product) {
+    product = await db.query.products.findFirst({
+      where: and(ilike(products.sku, trimmed), eq(products.storeId, storeId)),
+    });
+  }
+
+  return product;
+}
+
 export async function createProduct(storeId: string, input: CreateProductInput) {
   if (input.categoryId) {
     await assertCategoryBelongsToStore(storeId, input.categoryId);
@@ -88,13 +105,41 @@ export async function createProduct(storeId: string, input: CreateProductInput) 
       })
       .returning();
 
+    const initialStock = input.initialStock ?? 0;
+    const minStock = input.minStock ?? 0;
+
     await db.insert(inventory).values({
       storeId,
       productId: product.id,
-      currentStock: 0,
-      minStock: 0,
+      currentStock: initialStock,
+      minStock: minStock,
       safetyStock: 0,
     });
+
+    if (initialStock > 0) {
+      await db.insert(inventoryMovements).values({
+        storeId,
+        productId: product.id,
+        quantityChange: initialStock,
+        reason: "initial_count",
+        note: "Initial physical stock registered at product creation",
+      });
+    }
+
+    if (input.supplierId) {
+      const sup = await db.query.suppliers.findFirst({
+        where: and(eq(suppliers.id, input.supplierId), eq(suppliers.storeId, storeId)),
+      });
+      if (sup) {
+        await db.insert(supplierProducts).values({
+          supplierId: input.supplierId,
+          productId: product.id,
+          leadTimeDays: 3,
+          moq: 1,
+          cost: input.costPrice.toString(),
+        });
+      }
+    }
 
     return product;
   } catch (err: unknown) {

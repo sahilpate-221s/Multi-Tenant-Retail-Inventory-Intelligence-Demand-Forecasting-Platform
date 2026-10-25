@@ -22,9 +22,18 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<AuthUser | null>(null);
-    const [accessToken, setAccessToken] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [user, setUser] = useState<AuthUser | null>(() => {
+        try {
+            const raw = localStorage.getItem("stockpilot_auth_user");
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    });
+    const [accessToken, setAccessToken] = useState<string | null>(() => {
+        return typeof window !== "undefined" ? localStorage.getItem("stockpilot_access_token") : null;
+    });
+    const [isLoading, setIsLoading] = useState(!user);
 
     // On app load, try to silently refresh using the HTTP-only cookie.
     useEffect(() => {
@@ -34,10 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setAccessTokenForClient(data.accessToken);
                 setAccessToken(data.accessToken);
                 setUser(data.user);
+                localStorage.setItem("stockpilot_auth_user", JSON.stringify(data.user));
             })
             .catch(() => {
-                // No valid session — that's fine, user just isn't logged in.
-                setAccessTokenForClient(null);
+                // If refresh failed and no access token, clear
+                if (!localStorage.getItem("stockpilot_access_token")) {
+                    setAccessTokenForClient(null);
+                    setUser(null);
+                }
             })
             .finally(() => setIsLoading(false));
     }, []);
@@ -54,6 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessTokenForClient(data.accessToken);
         setAccessToken(data.accessToken);
         setUser(data.user);
+        localStorage.setItem("stockpilot_auth_user", JSON.stringify(data.user));
     }
 
     async function register(storeName: string, email: string, password: string) {
@@ -68,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAccessTokenForClient(null);
             setAccessToken(null);
             setUser(null);
+            localStorage.removeItem("stockpilot_auth_user");
         }
     }
 

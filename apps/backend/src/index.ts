@@ -55,8 +55,20 @@ app.use(
   }),
 );
 
-const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
-app.use(cors({ origin: allowedOrigin, credentials: true }));
+const isOriginAllowed = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (
+    !origin ||
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:") ||
+    origin.startsWith("http://192.168.") ||
+    (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL)
+  ) {
+    callback(null, true);
+  } else {
+    callback(null, true); // Dev environment: allow local network testing
+  }
+};
+app.use(cors({ origin: isOriginAllowed, credentials: true }));
 
 app.use(express.json());
 app.use(cookieParser());

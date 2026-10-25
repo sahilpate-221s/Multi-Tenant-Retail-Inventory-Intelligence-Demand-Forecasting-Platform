@@ -34,3 +34,15 @@ export function useDeleteSupplier() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["suppliers"] }),
   });
 }
+
+export function useLinkSupplierProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { supplierId: string; productId: string; leadTimeDays: number; moq: number; cost: number }) =>
+      apiClient.post("/api/suppliers/product-links", input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["product-suppliers"] });
+    },
+  });
+}
