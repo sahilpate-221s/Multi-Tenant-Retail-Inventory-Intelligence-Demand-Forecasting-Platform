@@ -158,5 +158,5 @@ app.use("/api/telemetry", telemetryRoutes);
 app.use("/admin/queues", serverAdapter.getRouter());
 
 app.listen(PORT, () => {
-  console.log(`StockPilot backend running on http://localhost:${PORT}`);
+  logger.info(`StockPilot backend running on http://localhost:${PORT}`);
 });

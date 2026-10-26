@@ -93,8 +93,8 @@ export function saveKhataCustomers(storeId: string, customers: KhataCustomer[]) 
   try {
     localStorage.setItem(getStorageKey(storeId), JSON.stringify(customers));
     window.dispatchEvent(new Event("khata-updated"));
-  } catch (err) {
-    console.error("Failed to save Khata ledger to localStorage", err);
+  } catch {
+    // Silently ignore storage quota errors
   }
 }
 

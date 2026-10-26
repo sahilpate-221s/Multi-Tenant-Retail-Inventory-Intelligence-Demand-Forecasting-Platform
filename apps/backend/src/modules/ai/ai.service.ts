@@ -2,6 +2,7 @@ import { genAI } from "./geminiProvider";
 import { toolDefinitions, toolNameToFunction } from "./toolDefinitions";
 import * as tools from "./tools";
 import { getOrCreateConversation, getRecentMessages, appendMessage } from "./conversation.service";
+import { logger } from "../../lib/logger";
 
 const SYSTEM_PROMPT = `You are the StockPilot AI Assistant, helping a small retail store owner understand their inventory data.
 
@@ -23,7 +24,7 @@ export async function askAssistant(storeId: string, userQuestion: string): Promi
     throw new Error("AI_UNAVAILABLE");
   }
 
-  console.log(`[AI] Received question: "${userQuestion}"`);
+  logger.info({ storeId, userQuestion }, "[AI] Received question");
 
   const conversation = await getOrCreateConversation(storeId);
   const recentMessages = await getRecentMessages(conversation.id);
@@ -48,7 +49,7 @@ export async function askAssistant(storeId: string, userQuestion: string): Promi
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const functionCalls = currentResponse.functionCalls;
-    console.log(`[AI] Round ${round} - tool calls requested:`, functionCalls?.map((fc) => fc.name) ?? "none");
+    logger.debug({ round, tools: functionCalls?.map((fc) => fc.name) ?? [] }, "[AI] Round tool calls");
 
     if (!functionCalls || functionCalls.length === 0) {
       break; // model returned real text - done

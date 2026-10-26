@@ -4,6 +4,8 @@
  * that wiring in a real provider (SendGrid, SES, etc.) later touches
  * ONE file, not every place that wants to send a notification email.
  */
+import { logger } from "../../lib/logger";
+
 export interface EmailMessage {
   to: string;
   subject: string;
@@ -20,7 +22,7 @@ export interface EmailProvider {
  */
 export class ConsoleEmailProvider implements EmailProvider {
   async send(message: EmailMessage): Promise<void> {
-    console.log(`[EmailProvider - NOT ACTUALLY SENT] To: ${message.to} | Subject: ${message.subject}`);
+    logger.info({ to: message.to, subject: message.subject }, "[EmailProvider - Simulation] Notification email queued");
   }
 }
 

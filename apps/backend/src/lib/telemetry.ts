@@ -26,9 +26,9 @@ class TelemetryService {
     const dsn = process.env.SENTRY_DSN;
     if (dsn) {
       this.hasSentry = true;
-      console.log("[Telemetry] Sentry DSN detected. Centralized remote telemetry initialized.");
+      logger.info("[Telemetry] Sentry DSN detected. Centralized remote telemetry initialized.");
     } else {
-      console.log("[Telemetry] Sentry DSN not provided. Structured local logger active.");
+      logger.info("[Telemetry] Sentry DSN not provided. Structured local logger active.");
     }
   }
 

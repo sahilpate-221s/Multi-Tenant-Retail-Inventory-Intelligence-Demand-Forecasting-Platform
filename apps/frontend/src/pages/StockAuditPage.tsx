@@ -5,6 +5,7 @@ import { useCategories } from "../hooks/useProducts";
 import { useStoreSettings } from "../hooks/useSettings";
 import LoadingState from "../components/states/LoadingState";
 import ErrorState from "../components/states/ErrorState";
+import { telemetry } from "../lib/telemetry";
 
 interface AuditRowState {
   physicalCount: number | "";
@@ -195,7 +196,7 @@ export default function StockAuditPage() {
           note: `Bulk Physical Audit: Shelf had ${item.physical}, System had ${item.system}`,
         });
       } catch (err) {
-        console.error("Failed to reconcile", item.name, err);
+        telemetry.reportError(err, { item: item.name, action: "bulk_reconcile" });
       }
     }
 

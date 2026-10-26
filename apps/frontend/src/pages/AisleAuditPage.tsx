@@ -432,8 +432,7 @@ export default function AisleAuditPage() {
         });
         return next;
       });
-    } catch (err) {
-      console.error("Reconciliation failed:", err);
+    } catch {
       alert("A problem occurred during reconciliation. Some adjustments may not have been saved.");
     } finally {
       setIsReconciling(false);

@@ -53,7 +53,6 @@ export const telemetry = {
    */
   reportError(error: Error | unknown, context?: Record<string, unknown>) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.error("[Telemetry] Reporting error:", err.message, context);
 
     sendTelemetry({
       message: err.message,
@@ -71,8 +70,6 @@ export const telemetry = {
    * Reports barcode scanner failure at counter (e.g., unrecognizable symbology, camera failure)
    */
   reportScanFailure(barcode: string, reason: string, context?: Record<string, unknown>) {
-    console.warn(`[Telemetry] Barcode scan failure for "${barcode}": ${reason}`);
-
     sendTelemetry({
       message: `Barcode scan failed: ${reason} (code: ${barcode})`,
       source: "barcode_scanner",
@@ -88,8 +85,6 @@ export const telemetry = {
    * Reports network timeout or connection drop at counter
    */
   reportNetworkTimeout(endpoint: string, durationMs: number) {
-    console.warn(`[Telemetry] Network timeout on ${endpoint} after ${durationMs}ms`);
-
     sendTelemetry({
       message: `POS Network timeout on ${endpoint} (${durationMs}ms)`,
       source: "network",

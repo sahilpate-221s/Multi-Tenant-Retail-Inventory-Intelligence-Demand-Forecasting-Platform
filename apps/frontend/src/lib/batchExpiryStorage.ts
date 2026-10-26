@@ -80,8 +80,8 @@ export function savePerishableBatches(storeId: string, batches: PerishableBatch[
   try {
     localStorage.setItem(getStorageKey(storeId), JSON.stringify(batches));
     window.dispatchEvent(new Event("batches-updated"));
-  } catch (err) {
-    console.error("Failed to save perishable batches", err);
+  } catch {
+    // Silently ignore storage quota errors
   }
 }
 
