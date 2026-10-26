@@ -20,7 +20,7 @@ Traditional inventory software only answers: *"What do I have?"*
 ## 📑 Table of Contents
 
 - [🌟 Shopkeeper Guide & Feature Manual (Hinglish)](docs/product/SHOPKEEPER_COMPLETE_FLOW_AND_OPTIONS_GUIDE.md)
-- [🚨 Brutal Honest Audit & Missing Things](docs/AUDIT_AND_MISSING_THINGS_BRUTAL_HONESTY.md)
+- [🚨 Brutal Honest Audit & Missing Things](docs/BRUTAL_AUDIT_AND_MISSING_THINGS.md)
 - [🎯 Master Interview Preparation & Architecture Guide](docs/INTERVIEW_PREPARATION_GUIDE.md)
 - [Key Architectural Highlights](#-key-architectural-highlights)
 - [System Architecture & Monorepo](#-system-architecture--monorepo)
@@ -389,8 +389,10 @@ pytest
 
 ### 🌟 Practical User & Interview Guides
 - [Shopkeeper Complete Flow & Feature Manual (Hinglish)](docs/product/SHOPKEEPER_COMPLETE_FLOW_AND_OPTIONS_GUIDE.md) — Daily workflow (Morning to Night), screen-by-screen breakdown, and beginner shopkeeper guide.
-- [Brutal Honest Audit & Missing Things Guide](docs/AUDIT_AND_MISSING_THINGS_BRUTAL_HONESTY.md) — Transparent assessment of technical gaps, user friction points, and prioritized P0/P1/P2 roadmap.
+- [Beginner Shopkeeper Quick Guide (Hinglish)](docs/SHOPKEEPER_GUIDE_HINGLISH.md) — Direct practical guide for store cashiers and daily routine hisaab.
+- [Brutal Honest Audit & Missing Things Guide](docs/BRUTAL_AUDIT_AND_MISSING_THINGS.md) — Transparent assessment of technical gaps, user friction points, and prioritized P0/P1/P2 roadmap.
 - [Master Interview Preparation Guide](docs/INTERVIEW_PREPARATION_GUIDE.md) — Comprehensive technical guide with elevator pitch, tech stack justifications, 25 Q&As, and ChatGPT mock interview prompts.
+- [AI Technical Mentor Prompt](docs/AI_TECHNICAL_MENTOR_PROMPT.md) — System prompt for AI technical pair programming and mentoring.
 
 ### 🏛 Architecture & Engineering
 - [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) — Topology, component roles, and interaction diagrams.
@@ -424,9 +426,9 @@ pytest
 - [ADR-006: Hybrid AI Architecture](docs/decisions/ADR-006-hybrid-ai-deterministic-forecasting.md)
 
 ### 📋 Project Management & Audits
-- [Project Status (Phase 24 Complete)](PROJECT_STATUS.md) — Complete phase-by-phase completion log.
-- [Comprehensive Architectural Audit](PROJECT_COMPREHENSIVE_AUDIT.md) — Evaluation and quality metrics.
-- [Step-by-Step Testing Guide](STEP_BY_STEP_TESTING_GUIDE.md) — Detailed manual testing journeys.
+- [Project Status (Phase 24 Complete)](docs/PROJECT_STATUS.md) — Complete phase-by-phase completion log.
+- [Comprehensive Architectural Audit](docs/PROJECT_COMPREHENSIVE_AUDIT.md) — Evaluation and quality metrics.
+- [Step-by-Step Testing Guide](docs/STEP_BY_STEP_TESTING_GUIDE.md) — Detailed manual testing journeys.
 - [Changelog](CHANGELOG.md) — Historical release log.
 - [Contributing Guide](CONTRIBUTING.md) — Development setup and contribution workflows.
 

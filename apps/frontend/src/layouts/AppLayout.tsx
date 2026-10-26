@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef, useMemo, Suspense } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/authContext";
 import { useStoreSettings } from "../hooks/useSettings";
 import NotificationBell from "../components/notifications/NotificationBell";
@@ -59,9 +59,16 @@ function AppLayout() {
   const { logout, user } = useAuth();
   const { data: store } = useStoreSettings();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+  // Auto-close mobile drawer on navigation
+  useEffect(() => {
+    setMobileDrawerOpen(false);
+  }, [location.pathname]);
 
   const isCashier = user?.role === "cashier";
 
@@ -166,9 +173,9 @@ function AppLayout() {
       className="h-screen w-screen overflow-hidden flex"
       style={{ background: "var(--color-sp-base)" }}
     >
-      {/* ─── SIDEBAR (INDEPENDENT SCROLLING CONTAINER — NO FOOTER) ─── */}
+      {/* ─── DESKTOP SIDEBAR (HIDDEN ON MOBILE < 1024px) ─── */}
       <aside
-        className="h-full relative shrink-0 flex flex-col select-none overflow-hidden sp-glass z-20"
+        className="hidden lg:flex h-full relative shrink-0 flex-col select-none overflow-hidden sp-glass z-20"
         style={{
           width: `${sidebarWidth}px`,
           borderRight: "1px solid rgba(255, 255, 255, 0.08)",
@@ -307,17 +314,111 @@ function AppLayout() {
         </nav>
       </aside>
 
+      {/* ─── MOBILE SLIDE-OVER DRAWER (< 1024px) ─── */}
+      {mobileDrawerOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden flex">
+          {/* Backdrop Blur Overlay */}
+          <div
+            className="fixed inset-0 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+            onClick={() => setMobileDrawerOpen(false)}
+          />
+
+          {/* Drawer Content */}
+          <aside
+            className="relative w-[285px] max-w-[85vw] h-full bg-[#0c0c0e]/98 border-r border-white/10 flex flex-col z-10 shadow-[0_0_50px_rgba(0,0,0,0.9)] animate-in slide-in-from-left duration-200"
+          >
+            {/* Drawer Header */}
+            <div className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-white/10 bg-[#121218]">
+              <div className="flex items-center gap-2">
+                <div
+                  className="w-7 h-7 relative shrink-0 flex items-center justify-center rounded-lg"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(30,28,34,0.9), rgba(14,14,18,0.95))",
+                    border: "1px solid rgba(212,168,83,0.35)",
+                  }}
+                >
+                  <span className="text-xs font-black text-[#d4a853]">SP</span>
+                </div>
+                <span className="text-sm font-bold tracking-widest text-[#f4f4f5]">STOCK</span>
+                <span className="text-sm font-bold tracking-widest text-[#d4a853]">PILOT</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileDrawerOpen(false)}
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-xs text-[#97979d] hover:text-white bg-white/5 hover:bg-white/10 cursor-pointer"
+                aria-label="Close menu"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Navigation links */}
+            <nav className="flex-1 overflow-y-auto overscroll-contain py-3 px-3">
+              {displayedNavSections.map((section) => (
+                <div key={section.label} className="mb-4">
+                  <p className="px-2 mb-1 text-[9px] font-bold text-[#71717a] uppercase tracking-wider">
+                    {section.label}
+                  </p>
+                  <div className="flex flex-col gap-0.5">
+                    {section.items.map((item) => (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setMobileDrawerOpen(false)}
+                        className={({ isActive }) =>
+                          `block px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                            isActive
+                              ? "bg-[#d4a853]/20 text-[#f5cf7b] border-l-2 border-[#d4a853] font-bold"
+                              : "text-[#a1a1aa] hover:text-white hover:bg-white/5"
+                          }`
+                        }
+                      >
+                        {item.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </nav>
+
+            {/* Store & User footer */}
+            <div className="p-3 border-t border-white/10 bg-[#121218]/50 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 truncate">
+                <div className="w-6 h-6 rounded-md bg-[#d4a853]/20 text-[#d4a853] flex items-center justify-center text-[10px] font-bold">
+                  {userInitial}
+                </div>
+                <span className="text-white truncate font-medium">{store?.name || userDisplayName}</span>
+              </div>
+              <span className="text-[10px] font-mono text-[#71717a] uppercase">
+                {isCashier ? "Cashier" : "Owner"}
+              </span>
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* ─── MAIN AREA (INDEPENDENT SCROLLING VIEWPORT — NO FOOTER) ─── */}
       <div className="h-full flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Sleek High-End Frosted Glass Navbar */}
         <header
-          className="h-14 shrink-0 flex items-center justify-between px-6 z-30 sp-glass"
+          className="h-14 shrink-0 flex items-center justify-between px-3 sm:px-6 z-30 sp-glass"
           style={{
             borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
           }}
         >
-          {/* Left: Store Name Badge */}
-          <div className="flex items-center gap-3">
+          {/* Left: Mobile Hamburger Button + Store Name Badge */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileDrawerOpen(true)}
+              className="lg:hidden p-2 rounded-xl text-[#d4a853] bg-white/[0.04] border border-white/10 hover:bg-white/[0.08] active:scale-95 transition-all cursor-pointer flex items-center justify-center"
+              aria-label="Open Navigation Menu"
+              title="Open Navigation Menu"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 shadow-sm">
               <div className="w-5 h-5 rounded-md bg-[#d4a853]/15 border border-[#d4a853]/30 flex items-center justify-center text-[#d4a853]">
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -495,7 +596,7 @@ function AppLayout() {
 
         {/* Independently Scrollable Main Viewport (With subtle living background animation & NO footer) */}
         <main
-          className="flex-1 overflow-y-auto overscroll-contain relative flex flex-col"
+          className="flex-1 overflow-y-auto overscroll-contain relative flex flex-col pb-16 lg:pb-0"
           style={{ background: "var(--color-sp-base)" }}
         >
           {/* Classy Ambient Background Animation for all internal pages */}
@@ -514,6 +615,66 @@ function AppLayout() {
             </Suspense>
           </div>
         </main>
+
+        {/* ─── SLEEK MOBILE BOTTOM QUICK BAR (< 1024px) ─── */}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c0c0e]/95 backdrop-blur-2xl border-t border-white/10 flex items-center justify-around py-2 px-1 shadow-[0_-10px_30px_rgba(0,0,0,0.8)]">
+          <NavLink
+            to="/pos"
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                isActive ? "text-[#d4a853]" : "text-[#71717a] hover:text-[#f4f4f5]"
+              }`
+            }
+          >
+            <span className="text-base">🛒</span>
+            <span>Billing</span>
+          </NavLink>
+
+          <NavLink
+            to={isCashier ? "/sales" : "/products"}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                isActive ? "text-[#d4a853]" : "text-[#71717a] hover:text-[#f4f4f5]"
+              }`
+            }
+          >
+            <span className="text-base">{isCashier ? "📜" : "📦"}</span>
+            <span>{isCashier ? "Sales" : "Products"}</span>
+          </NavLink>
+
+          <NavLink
+            to="/inventory"
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                isActive ? "text-[#d4a853]" : "text-[#71717a] hover:text-[#f4f4f5]"
+              }`
+            }
+          >
+            <span className="text-base">📊</span>
+            <span>Stock</span>
+          </NavLink>
+
+          <NavLink
+            to="/notifications"
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                isActive ? "text-[#d4a853]" : "text-[#71717a] hover:text-[#f4f4f5]"
+              }`
+            }
+          >
+            <span className="text-base">🔔</span>
+            <span>Alerts</span>
+          </NavLink>
+
+          <button
+            type="button"
+            onClick={() => setMobileDrawerOpen(true)}
+            className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg text-[10px] font-bold text-[#71717a] hover:text-[#f4f4f5] cursor-pointer"
+          >
+            <span className="text-base">☰</span>
+            <span>Menu</span>
+          </button>
+        </nav>
       </div>
     </div>
   );
