@@ -14,9 +14,33 @@ const router = Router();
 // real gap for now, not glossed over.
 router.get("/queues", async (_req, res) => {
   const counts = await csvImportQueue.getJobCounts("waiting", "active", "completed", "failed", "delayed");
+  const failedJobs = await csvImportQueue.getFailed(0, 25);
+  const deadLetterJobs = failedJobs.map((j) => ({
+    id: j.id,
+    name: j.name,
+    attemptsMade: j.attemptsMade,
+    failedReason: j.failedReason,
+    timestamp: j.timestamp,
+    processedOn: j.processedOn,
+    isDeadLetter: j.attemptsMade >= (j.opts.attempts || 5),
+    data: j.data ? { importId: j.data.importId, storeId: j.data.storeId } : null,
+  }));
+
   res.status(200).json({
     success: true,
-    data: { queues: { "csv-import": counts } },
+    data: {
+      queues: {
+        "csv-import": {
+          counts,
+          reliability: {
+            maxAttempts: 5,
+            backoff: "exponential (2000ms delay)",
+            dlqRetention: true,
+          },
+          deadLetterJobs,
+        },
+      },
+    },
   });
 });
 

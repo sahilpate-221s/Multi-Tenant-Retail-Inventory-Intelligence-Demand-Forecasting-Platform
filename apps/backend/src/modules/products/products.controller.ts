@@ -110,6 +110,9 @@ export async function patchProduct(req: Request, res: Response) {
 
 export async function removeProduct(req: Request, res: Response) {
   const deleted = await deleteProduct(req.auth!.storeId, req.params.id as string);
+  if (!deleted) {
+    return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
+  }
   await logAuditEvent({
     storeId: req.auth!.storeId,
     userId: req.auth!.userId,
@@ -118,8 +121,5 @@ export async function removeProduct(req: Request, res: Response) {
     entityId: deleted.id,
     details: { name: deleted.name },
   });
-  if (!deleted) {
-    return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
-  }
-  return res.status(200).json({ success: true, data: { id: deleted.id } });
+  return res.status(200).json({ success: true, data: { id: deleted.id, deletedAt: deleted.deletedAt } });
 }

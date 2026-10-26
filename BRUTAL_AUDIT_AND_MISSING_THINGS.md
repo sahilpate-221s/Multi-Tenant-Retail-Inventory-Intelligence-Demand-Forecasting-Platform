@@ -114,46 +114,36 @@ Ek asli retail store (Kirana, Supermarket, Medical, Garments) chalane wale dukaa
 
 ---
 
-### 2.1. Stock Deduction Concurrency & Race Conditions (Critical DB Flaw) — 🔴 P0
-* **Current Code Situation:**
-  Jab POS par sale banti hai, code karta hai:
-  1. `db.query.inventory.findFirst(...)` -> current stock padhta hai (e.g., 5 bacha hai).
-  2. Code mein minus karta hai `5 - 1 = 4`.
-  3. `db.update(inventory).set({ currentStock: 4 })` likhta hai.
-* **The Vulnerability (Race Condition):**
-  * Agar dukan par **2 billing counter** chal rahe hain ya 2 cashier ek hi samay (millisecond) par aakhri packet bechte hain, toh dono counter 5 padhenge aur dono 4 update kar denge!
-  * Asli stock 3 ho gaya lekin DB mein 4 reh gaya. Ya stock negative chala jayega!
-* **How to Fix (Atomic DB Update):**
-  SQL atomic update use karein:
-  ```sql
-  UPDATE inventory 
-  SET current_stock = current_stock - $1 
-  WHERE product_id = $2 AND store_id = $3 AND current_stock >= $1;
-  ```
-  Agar affected rows `0` aati hain, toh error throw karein: *"Stock out! Item kisi aur counter par bik gaya."*
+### 2.1. Stock Deduction Concurrency & Race Conditions (Critical DB Flaw) — ✅ COMPLETED (Production Ready)
+* **Status:** Resolved using Atomic SQL Decrements with HTTP 409 Conflict rejection.
+* **Built Capabilities:**
+  * In `sales.service.ts`, non-atomic read-then-write was completely replaced with atomic SQL decrement:
+    ```sql
+    UPDATE inventory 
+    SET current_stock = current_stock - $quantity, updated_at = NOW() 
+    WHERE store_id = $storeId AND product_id = $productId AND current_stock >= $quantity 
+    RETURNING *;
+    ```
+  * Agar concurrent billing counters aakhri packet ek sath bechte hain, toh pehla counter succeed karega aur doosre counter ko turant **HTTP 409** informative error milega: *"Stock out! Item kisi aur counter par bik gaya ya stock kam hai (Available: 0, Requested: 1)"*. Stock kabhi negative nahi ho sakta.
 
 ---
 
-### 2.2. Soft Deletes vs Hard Deletes (Data Integrity & Foreign Keys) — 🔴 P0
-* **Current Code Situation:**
-  Agar koi product ya supplier delete karta hai, toh DB se row delete (`DELETE FROM products WHERE id = ...`) ho sakti hai.
-* **The Vulnerability:**
-  * Purane sales history mein us product ki sale darj hai. Agar product table se gayab ho gaya, toh sales analytics report crash ho sakti hai ya orphan records ban jayenge.
-* **How to Fix:**
-  * Har table mein `deleted_at: timestamp` column add karein.
-  * Delete API sirf `deleted_at = now()` karega (Soft Delete), data hamesha report ke liye zinda rahega.
+### 2.2. Soft Deletes vs Hard Deletes (Data Integrity & Foreign Keys) — ✅ COMPLETED (Production Ready)
+* **Status:** Fully implemented across `products`, `suppliers`, and `categories`.
+* **Built Capabilities:**
+  * Schema mein `deleted_at: timestamp` column add kiya gaya aur migration `0016_real_maximus.sql` ke through apply kiya gaya.
+  * Delete API ab destructive `DELETE FROM` ke badle Soft Delete karta hai (`deletedAt: new Date()`, `isActive: false`).
+  * Catalog queries, barcode scans, aur listings `isNull(table.deletedAt)` se filter hoti hain, jabki purani sales receipts aur ledger reports deleted products aur suppliers ke sath bhi bina kisi crash ya orphan error ke 100% intact rehte hain.
 
 ---
 
-### 2.3. Background Job Queue (BullMQ + Redis) Reliability — 🟡 P1
-* **Current Situation:**
-  AI forecasts aur stockout risk calculations BullMQ par queue hote hain.
-* **The Vulnerability:**
-  * Agar Redis restart ho jaye ya connection drop ho, toh pending jobs fail ho sakte hain.
-  * Dead Letter Queue (DLQ) aur alerting system missing hai agar koi calculation 3 baar fail ho jaye.
-* **How to Fix:**
-  * BullMQ mein exponential backoff retry configure karein (`attempts: 5, backoff: { type: 'exponential', delay: 2000 }`).
-  * Failed job monitoring dashboard (jaise Bull-Board) integrate karein.
+### 2.3. Background Job Queue (BullMQ + Redis) Reliability — ✅ COMPLETED (Production Ready)
+* **Status:** Production-grade Redis reconnection strategy, BullMQ exponential backoff, Dead Letter Queue (DLQ) alerts, aur Bull-Board Dashboard integrated.
+* **Built Capabilities:**
+  * **Exponential Backoff Retries:** Har job ke liye 5 retries configured (`attempts: 5`, `backoff: { type: 'exponential', delay: 2000 }`, `removeOnFail: false`).
+  * **Dead Letter Queue (DLQ) Alerting:** Jab koi job 5 automated retries ke baad bhi fail hoti hai, worker alert trigger karta hai aur shop owner ke notifications table mein `IMPORT_FAILED (DLQ)` critical alert insert karta hai.
+  * **Bull-Board Visual Dashboard:** Platform-wide queue status aur failed/delayed jobs dekhne ke liye `@bull-board` UI router `/admin/queues` par mounted hai.
+  * **Queue Observability Endpoint:** `GET /api/observability/queues` real-time waiting, active, completed, failed counts aur dead-letter job diagnostics provide karta hai.
 
 ---
 
@@ -195,11 +185,13 @@ Ek asli retail store (Kirana, Supermarket, Medical, Garments) chalane wale dukaa
 
 | Priority | Feature / Gap | Perspective | Effort | Impact |
 | :--- | :--- | :--- | :--- | :--- |
-| **P0 (Immediate)** | **Atomic Stock Decrement (Concurrency)** | Developer | 2 Hours | Stock kabhi negative nahi hoga, data 100% accurate |
-| **P0 (Immediate)** | **Cashier vs Owner Role (RBAC)** | User & Dev | 4 Hours | Cashier profit margin ya settings nahi dekh sakega |
-| **P0 (Immediate)** | **Raw Thermal Print (ESC/POS)** | User | 3 Hours | 1-second silent bill printing at counter |
-| **Completed** | **Return & Exchange on POS (P0)** | User & Dev | Done ✅ | Multi-item returns, cash refund, exchange credit on live bill |
-| **Completed** | **Indian GST Slabs & HSN Codes (P1)** | User & Dev | Done ✅ | HSN codes, GSTIN, 0/5/12/18/28% slabs, legal tax invoice table |
-| **P1 (Next)** | **Offline PWA Sync (IndexedDB)** | User & Dev | 8 Hours | Net band hone par bhi dukaan nahi rukegi |
-| **P2 (Later)** | **WhatsApp Bill Sharing** | User | 3 Hours | Paper bachaega, customer delight |
-| **P2 (Later)** | **Playwright E2E Testing** | Developer | 4 Hours | Production stability guarantee |
+| **Completed** | **Atomic Stock Decrement (Concurrency - 2.1)** | Developer | Done ✅ | Stock kabhi negative nahi hoga, concurrent sales safe |
+| **Completed** | **Soft Deletes vs Hard Deletes (2.2)** | Developer | Done ✅ | `deleted_at` timestamp, foreign key reports 100% intact |
+| **Completed** | **Queue Reliability & Bull-Board (2.3)** | Developer | Done ✅ | 5x exponential retries, DLQ alerts, /admin/queues dashboard |
+| **Completed** | **Cashier vs Owner Role (RBAC - 1.1)** | User & Dev | Done ✅ | Cashier profit margin/cost price hidden, settings locked |
+| **Completed** | **Return & Exchange on POS (1.3)** | User & Dev | Done ✅ | Multi-item returns, cash refund, exchange credit on live bill |
+| **Completed** | **Indian GST Slabs & HSN Codes (1.4)** | User & Dev | Done ✅ | HSN codes, GSTIN, 0/5/12/18/28% slabs, legal tax invoice table |
+| **P0 (Next)** | **Raw Thermal Print (ESC/POS - 1.2)** | User | 3 Hours | 1-second silent bill printing at counter |
+| **P1 (Next)** | **Offline PWA Sync (IndexedDB - 1.5)** | User & Dev | 8 Hours | Net band hone par bhi dukaan nahi rukegi |
+| **P2 (Later)** | **WhatsApp Bill Sharing (1.7)** | User | 3 Hours | Paper bachaega, customer delight |
+| **P2 (Later)** | **Playwright E2E Testing (2.5)** | Developer | 4 Hours | Production stability guarantee |

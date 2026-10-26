@@ -98,14 +98,25 @@ export const importWorker = new Worker<CsvImportJobData>(
 );
 
 importWorker.on("failed", async (job, err) => {
-  console.error(`[import-worker] Job ${job?.id} failed entirely:`, err.message);
-  if (job?.data.importId) {
+  const attemptsMade = job?.attemptsMade ?? 0;
+  const maxAttempts = job?.opts?.attempts ?? 5;
+  const isDeadLetter = attemptsMade >= maxAttempts;
+
+  console.error(
+    `[import-worker] Job ${job?.id} attempt ${attemptsMade}/${maxAttempts} failed: ${err.message}`
+  );
+
+  if (isDeadLetter && job?.data.importId) {
+    console.error(
+      `🚨 [DLQ ALERT] Job ${job.id} for import ${job.data.importId} has entered DEAD LETTER state after ${attemptsMade} attempts. Error:`,
+      err
+    );
     await db.update(imports).set({ status: "failed" }).where(eq(imports.id, job.data.importId));
     await createNotification(
       job.data.storeId,
       "IMPORT_FAILED",
-      "Import failed",
-      "Your CSV import could not be processed. Please check the file and try again.",
+      "🚨 Critical: Background Import Failed (DLQ)",
+      `Your CSV import failed permanently after ${maxAttempts} automated retries. Reason: ${err.message}. Please verify the file and contact support if this recurs.`,
     );
   }
 });

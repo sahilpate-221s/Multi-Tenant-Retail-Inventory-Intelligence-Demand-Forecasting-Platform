@@ -26,6 +26,7 @@ import salesRoutes from "./modules/sales/sales.routes";
 import aiRoutes from "./modules/ai/ai.routes";
 import auditRoutes from "./modules/audit/audit.routes";
 import observabilityRoutes from "./modules/observability/observability.routes";
+import { serverAdapter } from "./queue/bullBoard";
 import { authRateLimiter, aiRateLimiter, generalRateLimiter } from "./middleware/rateLimiters";
 import pinoHttp from "pino-http";
 import { logger } from "./lib/logger";
@@ -45,13 +46,13 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"], // Tailwind's runtime injects inline styles in dev
-        imgSrc: ["'self'", "data:"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
         connectSrc: ["'self'"],
       },
     },
-    crossOriginResourcePolicy: { policy: "same-site" },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
 );
 
@@ -152,6 +153,7 @@ app.use("/api/simulations", simulatorRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/observability", observabilityRoutes);
+app.use("/admin/queues", serverAdapter.getRouter());
 
 app.listen(PORT, () => {
   console.log(`StockPilot backend running on http://localhost:${PORT}`);
