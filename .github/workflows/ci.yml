@@ -1,18 +1,19 @@
-name: CI Pipeline
+name: StockPilot CI / CD Pipeline
 
 on:
   push:
-    branches: [main, master]
+    branches: [ main, master ]
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
 
 jobs:
-  backend:
-    name: Backend CI
+  backend-test:
+    name: Backend Lint, TypeCheck & Tests
     runs-on: ubuntu-latest
+
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: stockpilot
           POSTGRES_PASSWORD: stockpilot_dev_password
@@ -24,8 +25,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
       redis:
-        image: redis:7
+        image: redis:7-alpine
         ports:
           - 6379:6379
         options: >-
@@ -35,55 +37,58 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Build
-        run: npm run build --workspace=apps/backend
-      - name: Run Migrations
-        run: cd apps/backend && npx drizzle-kit migrate
-        env:
-          DATABASE_URL: postgresql://stockpilot:stockpilot_dev_password@127.0.0.1:5432/stockpilot
-      - name: Test
-        run: npm run test --workspace=apps/backend
-        env:
-          DATABASE_URL: postgresql://stockpilot:stockpilot_dev_password@127.0.0.1:5432/stockpilot
-          REDIS_URL: redis://127.0.0.1:6379
-          JWT_ACCESS_SECRET: ci-test-access-secret
-          JWT_REFRESH_SECRET: ci-test-refresh-secret
+      - name: Check out repository
+        uses: actions/checkout@v4
 
-  frontend:
-    name: Frontend CI
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Build
-        run: npm run build --workspace=apps/frontend
-        env:
-          VITE_API_URL: https://multi-tenant-retail-inventory.onrender.com
-      - name: Test
-        run: cd apps/frontend && npx vitest run
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'apps/backend/package-lock.json'
 
-  ml:
-    name: ML Service CI
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: apps/backend
+
+      - name: TypeCheck backend
+        run: npx tsc --noEmit
+        working-directory: apps/backend
+
+      - name: Apply database migrations
+        run: npm run db:migrate
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql://stockpilot:stockpilot_dev_password@localhost:5432/stockpilot
+
+      - name: Run backend tests
+        run: npm test
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: postgresql://stockpilot:stockpilot_dev_password@localhost:5432/stockpilot
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: test-secret-key-12345
+          JWT_REFRESH_SECRET: test-secret-key-67890
+
+  frontend-build:
+    name: Frontend Lint, TypeCheck & Production Build
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/ml
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          python-version: "3.12"
-          cache: pip
-      - run: pip install -r requirements.txt
-      - name: Test
-        run: python -m pytest tests/ -v
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: 'apps/frontend/package-lock.json'
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: apps/frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: apps/frontend

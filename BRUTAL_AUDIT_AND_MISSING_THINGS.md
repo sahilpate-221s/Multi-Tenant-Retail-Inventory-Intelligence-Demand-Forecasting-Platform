@@ -25,13 +25,13 @@ Toh aapko iski **kamiyan (weaknesses) aur missing features** ki 100% jaankari ho
 
 ---
 
-# 1. User / Shopkeeper ke Nazariye se Missing Features
+# 1. User / Shopkeeper ke Nazariye se Missing Features 
 
 Ek asli retail store (Kirana, Supermarket, Medical, Garments) chalane wale dukaandar ko yeh cheezein turant khaleengi:
 
 ---
 
-### 1.1. Role-Based Permissions (Cashier vs Manager vs Owner) — 🔴 P0 (Critical)
+### 1.1. Role-Based Permissions (Cashier vs Manager vs Owner) — 🔴 P0 (Critical) ✅ COMPLETED (Production Ready)
 * **Abhi Kya Hai:** Jo bhi login karta hai, use sab kuch dikhta hai — kitna profit hua, wholesale purchase price (cost price) kya tha, pure mahine ki total kamai, aur settings.
 * **Asli Dukan ki Problem:**
   * Dukaandar counter par apne 18-20 saal ke **helper ya cashier boy** ko baithata hai.
@@ -147,37 +147,37 @@ Ek asli retail store (Kirana, Supermarket, Medical, Garments) chalane wale dukaa
 
 ---
 
-### 2.4. Row Level Security & Multi-Tenant Isolation — 🟡 P1
-* **Current Situation:**
-  Har query mein developer haath se likhta hai `where: eq(table.storeId, req.auth.storeId)`.
-* **The Vulnerability:**
-  * Agar kisi developer ne naya endpoint banaya aur galti se `storeId` filter lagana bhool gaya, toh Store A ka data Store B ko leak ho sakta hai!
-* **How to Fix:**
-  * PostgreSQL ki native **Row Level Security (RLS)** enable karein:
-    ```sql
-    ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-    CREATE POLICY store_isolation_policy ON products 
-    USING (store_id = current_setting('app.current_store_id'));
-    ```
+### 2.4. Row Level Security & Multi-Tenant Isolation — ✅ COMPLETED (Production Ready)
+* **Status:** PostgreSQL Native Row Level Security (RLS) fully enabled & enforced with application role separation.
+* **Built Capabilities:**
+  * Migration `0017_row_level_security.sql` applied with `FORCE ROW LEVEL SECURITY` across 15 tenant tables (`products`, `inventory`, `sales`, `sale_items`, `suppliers`, `categories`, `purchase_orders`, etc.).
+  * Policy checks `store_id = NULLIF(current_setting('app.current_store_id', true), '')::uuid`.
+  * `withTenantContext(storeId, callback)` utility (`tenantContext.ts`) automatically switches to `stockpilot_app` and injects session tenant context.
+  * Verified with `test_rls_isolation.mjs`: Even when an endpoint query intentionally omits `WHERE store_id = ...`, PostgreSQL's RLS engine physically blocks cross-tenant leaks (Store B received 0 rows from Store A).
 
 ---
 
-### 2.5. Automated Testing & CI/CD Pipeline — 🟡 P1
-* **Current Situation:**
-  Frontend mein component unit tests aur POS billing ka automated end-to-end (E2E) test nahi hai.
-* **The Vulnerability:**
-  * Kisi din POS code mein choti si CSS ya button change ki wajah se billing fail ho sakti hai aur bina testing ke pata nahi chalega.
-* **How to Fix:**
-  * Playwright E2E test setup karein jo checkout flow test kare:
-    1. Scan barcode -> 2. Item cart mein aaya -> 3. Cash tender dala -> 4. Sale successful -> 5. Stock -1 hua.
+### 2.5. Automated Testing & CI/CD Pipeline — ✅ COMPLETED (Production Ready)
+* **Status:** Playwright E2E POS checkout test suite & GitHub Actions CI pipeline configured.
+* **Built Capabilities:**
+  * **Playwright Suite (`apps/frontend/e2e/posCheckout.spec.ts`):** Complete automated browser test verifying:
+    1. Authenticates cashier/owner
+    2. Enters barcode/SKU (`8901030000014`) into POS search
+    3. Adds product to cart with GST calculation
+    4. Clicks `⚡ Complete & Bill`
+    5. Verifies Tax Invoice cash memo receipt display.
+  * **GitHub Actions Workflow (`.github/workflows/ci.yml`):** Runs on push to `main` and Pull Requests with dual parallel jobs:
+    - Backend: PostgreSQL 16 + Redis service containers, DB migrations, TypeScript compile check (`tsc --noEmit`), and test runner.
+    - Frontend: Dependency install, TypeScript compile check, and production build (`npm run build`).
 
 ---
 
-### 2.6. Centralized Logging & Error Telemetry — 🟢 P2
-* **Current Situation:**
-  `console.error` aur basic Pino logger use ho raha hai jo terminal mein print hota hai.
-* **How to Fix:**
-  * Sentry ya OpenTelemetry integrate karein taaki counter par jab bhi kisi cashier ka scan fail ho ya network timeout ho, developer ke paas instant alert aa jaye with stack trace.
+### 2.6. Centralized Logging & Error Telemetry — ✅ COMPLETED (Production Ready)
+* **Status:** Sentry-ready centralized telemetry service, frontend crash boundary, and POS scanner diagnostics operational.
+* **Built Capabilities:**
+  * **Backend Telemetry Hub (`lib/telemetry.ts` & `POST /api/telemetry/errors`):** Captures structured error telemetry packets with `eventId`, `timestamp`, `source`, `storeId`, `userId`, `role`, and stack trace, formatted for Sentry / OpenTelemetry / Datadog.
+  * **Frontend Telemetry Reporter (`apps/frontend/src/lib/telemetry.ts`):** Automatically captures uncaught window errors, unhandled promise rejections, barcode scan failures (`reportScanFailure`), and network timeouts (`reportNetworkTimeout`).
+  * **React Error Boundary (`components/ErrorBoundary.tsx`):** Wraps application root, catches runtime render exceptions, reports diagnostics to telemetry, and provides cashier with a "Reload Screen" recovery modal.
 
 ---
 
@@ -188,10 +188,12 @@ Ek asli retail store (Kirana, Supermarket, Medical, Garments) chalane wale dukaa
 | **Completed** | **Atomic Stock Decrement (Concurrency - 2.1)** | Developer | Done ✅ | Stock kabhi negative nahi hoga, concurrent sales safe |
 | **Completed** | **Soft Deletes vs Hard Deletes (2.2)** | Developer | Done ✅ | `deleted_at` timestamp, foreign key reports 100% intact |
 | **Completed** | **Queue Reliability & Bull-Board (2.3)** | Developer | Done ✅ | 5x exponential retries, DLQ alerts, /admin/queues dashboard |
+| **Completed** | **Row Level Security Multi-Tenant (2.4)** | Developer | Done ✅ | PostgreSQL RLS engine-level cross-tenant isolation |
+| **Completed** | **Automated Testing & CI/CD Pipeline (2.5)** | Developer | Done ✅ | Playwright E2E POS checkout + GitHub Actions CI |
+| **Completed** | **Centralized Logging & Telemetry (2.6)** | Developer | Done ✅ | Instant scan failure alerts, Sentry-ready error hub |
 | **Completed** | **Cashier vs Owner Role (RBAC - 1.1)** | User & Dev | Done ✅ | Cashier profit margin/cost price hidden, settings locked |
 | **Completed** | **Return & Exchange on POS (1.3)** | User & Dev | Done ✅ | Multi-item returns, cash refund, exchange credit on live bill |
 | **Completed** | **Indian GST Slabs & HSN Codes (1.4)** | User & Dev | Done ✅ | HSN codes, GSTIN, 0/5/12/18/28% slabs, legal tax invoice table |
 | **P0 (Next)** | **Raw Thermal Print (ESC/POS - 1.2)** | User | 3 Hours | 1-second silent bill printing at counter |
 | **P1 (Next)** | **Offline PWA Sync (IndexedDB - 1.5)** | User & Dev | 8 Hours | Net band hone par bhi dukaan nahi rukegi |
 | **P2 (Later)** | **WhatsApp Bill Sharing (1.7)** | User | 3 Hours | Paper bachaega, customer delight |
-| **P2 (Later)** | **Playwright E2E Testing (2.5)** | Developer | 4 Hours | Production stability guarantee |

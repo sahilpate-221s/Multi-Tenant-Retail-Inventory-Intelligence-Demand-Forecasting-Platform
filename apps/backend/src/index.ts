@@ -26,6 +26,7 @@ import salesRoutes from "./modules/sales/sales.routes";
 import aiRoutes from "./modules/ai/ai.routes";
 import auditRoutes from "./modules/audit/audit.routes";
 import observabilityRoutes from "./modules/observability/observability.routes";
+import telemetryRoutes from "./modules/telemetry/telemetry.routes";
 import { serverAdapter } from "./queue/bullBoard";
 import { authRateLimiter, aiRateLimiter, generalRateLimiter } from "./middleware/rateLimiters";
 import pinoHttp from "pino-http";
@@ -153,6 +154,7 @@ app.use("/api/simulations", simulatorRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/audit-logs", auditRoutes);
 app.use("/api/observability", observabilityRoutes);
+app.use("/api/telemetry", telemetryRoutes);
 app.use("/admin/queues", serverAdapter.getRouter());
 
 app.listen(PORT, () => {

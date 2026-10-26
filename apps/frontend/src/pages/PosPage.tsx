@@ -9,6 +9,7 @@ import { apiClient } from "../lib/apiClient";
 import type { Product, CreateSaleInput, Sale } from "../lib/types";
 import CameraBarcodeScanner, { type ScanResult } from "../components/scanner/CameraBarcodeScanner";
 import { lookupBarcodeInfo } from "../lib/barcodeLookup";
+import { telemetry } from "../lib/telemetry";
 
 // Retail POS scanner beep synthesizer
 function playBeepSound() {
@@ -577,6 +578,7 @@ export default function PosPage() {
         isSaving: false,
       });
       setScanStatus(`Item '${code}' not in catalog`);
+      telemetry.reportScanFailure(code, "Unrecognized barcode - prompted Quick Add");
     }
   };
 
