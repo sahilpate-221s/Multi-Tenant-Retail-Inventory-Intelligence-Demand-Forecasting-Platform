@@ -22,7 +22,11 @@ export async function getProducts(req: Request, res: Response) {
     });
   }
   const result = await listProducts(req.auth!.storeId, parsed.data);
-  return res.status(200).json({ success: true, data: result.items, pagination: result.pagination });
+  const isCashier = req.auth?.role === "cashier";
+  const items = isCashier
+    ? result.items.map((item) => ({ ...item, costPrice: null }))
+    : result.items;
+  return res.status(200).json({ success: true, data: items, pagination: result.pagination });
 }
 
 export async function getProduct(req: Request, res: Response) {
@@ -30,7 +34,11 @@ export async function getProduct(req: Request, res: Response) {
   if (!product) {
     return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: "Product not found." } });
   }
-  return res.status(200).json({ success: true, data: product });
+  const isCashier = req.auth?.role === "cashier";
+  return res.status(200).json({
+    success: true,
+    data: isCashier ? { ...product, costPrice: null } : product,
+  });
 }
 
 export async function getProductByBarcodeHandler(req: Request, res: Response) {
@@ -42,7 +50,11 @@ export async function getProductByBarcodeHandler(req: Request, res: Response) {
   if (!product) {
     return res.status(404).json({ success: false, error: { code: "PRODUCT_NOT_FOUND", message: `Product with barcode or SKU '${code}' not found.` } });
   }
-  return res.status(200).json({ success: true, data: product });
+  const isCashier = req.auth?.role === "cashier";
+  return res.status(200).json({
+    success: true,
+    data: isCashier ? { ...product, costPrice: null } : product,
+  });
 }
 
 export async function postProduct(req: Request, res: Response) {

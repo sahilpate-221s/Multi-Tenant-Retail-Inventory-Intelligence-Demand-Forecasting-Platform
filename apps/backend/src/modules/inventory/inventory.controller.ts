@@ -12,7 +12,11 @@ import { processRestockCsv } from "./restockProcessor";
 
 export async function getInventory(req: Request, res: Response) {
   const data = await listInventory(req.auth!.storeId);
-  return res.status(200).json({ success: true, data });
+  const isCashier = req.auth?.role === "cashier";
+  const sanitized = isCashier
+    ? data.map((item) => ({ ...item, costPrice: undefined }))
+    : data;
+  return res.status(200).json({ success: true, data: sanitized });
 }
 
 export async function postAdjustment(req: Request, res: Response) {

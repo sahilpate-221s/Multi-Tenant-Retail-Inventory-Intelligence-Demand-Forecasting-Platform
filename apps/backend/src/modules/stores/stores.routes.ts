@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "../../db/client";
 import { stores } from "../../db/schema";
-import { requireAuth } from "../auth/auth.middleware";
+import { requireAuth, requireOwner } from "../auth/auth.middleware";
 
 const router = Router();
 
@@ -25,7 +25,7 @@ router.get("/current", requireAuth, async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    data: { id: store.id, name: store.name, timezone: store.timezone, currency: store.currency },
+    data: { id: store.id, name: store.name, timezone: store.timezone, currency: store.currency, gstin: store.gstin },
   });
 });
 
@@ -35,9 +35,10 @@ const updateStoreSchema = z.object({
   name: z.string().min(2).max(255).optional(),
   timezone: z.string().min(1).max(100).optional(),
   currency: z.string().min(1).max(10).optional(),
+  gstin: z.string().max(20).optional().nullable(),
 });
 
-router.patch("/current", requireAuth, async (req, res) => {
+router.patch("/current", requireAuth, requireOwner, async (req, res) => {
   const parsed = updateStoreSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
@@ -63,6 +64,7 @@ router.patch("/current", requireAuth, async (req, res) => {
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
       ...(parsed.data.timezone ? { timezone: parsed.data.timezone } : {}),
       ...(parsed.data.currency ? { currency: parsed.data.currency } : {}),
+      ...(parsed.data.gstin !== undefined ? { gstin: parsed.data.gstin } : {}),
       updatedAt: new Date(),
     })
     .where(eq(stores.id, req.auth!.storeId))
@@ -75,6 +77,7 @@ router.patch("/current", requireAuth, async (req, res) => {
       name: updated.name,
       timezone: updated.timezone,
       currency: updated.currency,
+      gstin: updated.gstin,
     },
   });
 });

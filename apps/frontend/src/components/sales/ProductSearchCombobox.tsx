@@ -114,10 +114,12 @@ export function ProductSearchCombobox({
                         {currency}
                         {p.sellingPrice}
                       </div>
-                      <div className="text-[10px] text-[#71717a]">
-                        Cost: {currency}
-                        {p.costPrice}
-                      </div>
+                      {p.costPrice != null && (
+                        <div className="text-[10px] text-[#71717a]">
+                          Cost: {currency}
+                          {p.costPrice}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

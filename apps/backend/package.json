@@ -12,6 +12,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx src/scripts/seedShopData.ts",
     "db:studio": "drizzle-kit studio"
   },
   "keywords": [],
@@ -35,6 +36,8 @@
     "vitest": "^4.1.11"
   },
   "dependencies": {
+    "@bull-board/api": "^9.10.5",
+    "@bull-board/express": "^9.10.5",
     "@google/genai": "^2.21.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^6.3.4",

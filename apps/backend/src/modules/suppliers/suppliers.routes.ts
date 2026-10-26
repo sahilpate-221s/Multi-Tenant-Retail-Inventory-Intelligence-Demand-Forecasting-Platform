@@ -1,10 +1,11 @@
 import { Router } from "express";
-import { requireAuth } from "../auth/auth.middleware";
+import { requireAuth, requireOwner } from "../auth/auth.middleware";
 import { getSuppliers, postSupplier, patchSupplier, removeSupplier } from "./suppliers.controller";
 import { postSupplierProductLink, getProductSuppliers, deleteSupplierProductLink } from "./suppliers.controller";
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireOwner);
 
 router.get("/", getSuppliers);
 router.post("/", postSupplier);

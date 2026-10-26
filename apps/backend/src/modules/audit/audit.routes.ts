@@ -2,10 +2,11 @@ import { Router } from "express";
 import { eq, desc } from "drizzle-orm";
 import { db } from "../../db/client";
 import { auditLogs } from "../../db/schema";
-import { requireAuth } from "../auth/auth.middleware";
+import { requireAuth, requireOwner } from "../auth/auth.middleware";
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireOwner);
 
 router.get("/", async (req, res) => {
   const logs = await db.query.auditLogs.findMany({

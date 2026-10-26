@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { useAuth } from "../lib/authContext";
 import { useProducts, useCreateProduct } from "../hooks/useProducts";
 import { useInventory } from "../hooks/useInventory";
-import { useCreateSale } from "../hooks/useSales";
+import { useCreateSale, useSales, useProcessReturn } from "../hooks/useSales";
 import { useStoreSettings } from "../hooks/useSettings";
 import { useKhata } from "../hooks/useKhata";
 import { apiClient } from "../lib/apiClient";
-import type { Product, CreateSaleInput } from "../lib/types";
+import type { Product, CreateSaleInput, Sale } from "../lib/types";
 import CameraBarcodeScanner, { type ScanResult } from "../components/scanner/CameraBarcodeScanner";
 import { lookupBarcodeInfo } from "../lib/barcodeLookup";
 
@@ -35,6 +36,8 @@ interface CartItem {
   barcode?: string | null;
   unitPrice: number;
   costPrice?: number;
+  hsnCode?: string | null;
+  gstRate?: number;
   quantity: number;
   stockAvailable: number;
 }
@@ -106,11 +109,15 @@ function CompactUpiQr({ amount, currency }: { amount: number; currency: string }
 }
 
 export default function PosPage() {
+  const { user } = useAuth();
+  const isOwner = user?.role === "owner";
   const { data: store } = useStoreSettings();
   const currency = store?.currency === "USD" ? "$" : store?.currency === "EUR" ? "€" : store?.currency === "GBP" ? "£" : "₹";
   const { recordSale: recordKhataSale } = useKhata();
   const createSaleMutation = useCreateSale();
   const createProductMutation = useCreateProduct();
+  const processReturnMutation = useProcessReturn();
+  const { data: recentSalesData, refetch: refetchSales } = useSales({ limit: 12 });
   const { data: inventory = [] } = useInventory();
 
   // Stock lookup map
@@ -136,12 +143,35 @@ export default function PosPage() {
     name: string;
     price: string;
     costPrice: string;
+    hsnCode: string;
+    gstRate: string;
     isSaving: boolean;
   } | null>(null);
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
+
+  // Return & Exchange Flow State
+  const [isReturnModalOpen, setIsReturnModalOpen] = useState(false);
+  const [returnSearchInvoice, setReturnSearchInvoice] = useState("");
+  const [selectedReturnSale, setSelectedReturnSale] = useState<Sale | null>(null);
+  const [isLoadingSale, setIsLoadingSale] = useState(false);
+  const [returnItemSelections, setReturnItemSelections] = useState<Record<string, number>>({});
+  const [returnReason, setReturnReason] = useState("Customer exchange / changed mind");
+  const [customReturnReason, setCustomReturnReason] = useState("");
+  const [exchangeCredit, setExchangeCredit] = useState<{
+    saleId: string;
+    amount: number;
+    itemsDescription: string;
+  } | null>(null);
+  const [refundVoucher, setRefundVoucher] = useState<{
+    saleId: string;
+    refundMode: string;
+    totalRefundAmount: number;
+    items: { productName: string; quantity: number; refundAmount: number }[];
+    date: string;
+  } | null>(null);
 
   // Payment state
   const [paymentMethod, setPaymentMethod] = useState<"cash" | "upi" | "card" | "credit">("cash");
@@ -163,6 +193,20 @@ export default function PosPage() {
     saleDate: string;
     tenderedAmount?: number;
     changeAmount?: number;
+    cgstAmount?: number;
+    sgstAmount?: number;
+    totalTax?: number;
+    taxableAmount?: number;
+    exchangeCreditAmount?: number;
+    exchangeCreditSaleId?: string;
+    gstGroups?: Array<{
+      hsnCode: string;
+      gstRate: number;
+      taxableValue: number;
+      cgstAmount: number;
+      sgstAmount: number;
+      totalTax: number;
+    }>;
   } | null>(null);
 
   // Products catalogue
@@ -187,8 +231,12 @@ export default function PosPage() {
       if (e.key === "Escape") {
         if (completedOrder) {
           setCompletedOrder(null);
+        } else if (refundVoucher) {
+          setRefundVoucher(null);
         } else if (quickAddItem) {
           setQuickAddItem(null);
+        } else if (isReturnModalOpen) {
+          setIsReturnModalOpen(false);
         } else if (cart.length > 0) {
           clearCart();
         }
@@ -196,7 +244,7 @@ export default function PosPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [completedOrder, quickAddItem, cart.length]);
+  }, [completedOrder, refundVoucher, quickAddItem, isReturnModalOpen, cart.length]);
 
   // Cart operations
   const addToCart = (product: {
@@ -206,6 +254,8 @@ export default function PosPage() {
     barcode?: string | null;
     sellingPrice: number | string;
     costPrice?: number | string | null;
+    hsnCode?: string | null;
+    gstRate?: number | string | null;
   }) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
@@ -223,6 +273,8 @@ export default function PosPage() {
           barcode: product.barcode,
           unitPrice: Number(product.sellingPrice),
           costPrice: Number(product.costPrice || 0),
+          hsnCode: product.hsnCode ?? null,
+          gstRate: product.gstRate !== undefined && product.gstRate !== null ? Number(product.gstRate) : 0,
           quantity: 1,
           stockAvailable: stockMap.get(product.id) ?? 999,
         },
@@ -248,6 +300,8 @@ export default function PosPage() {
 
   const clearCart = () => {
     setCart([]);
+    setDiscountPercent(0);
+    setExchangeCredit(null);
     setTenderedAmount("");
     setCreditCustomerName("");
     setCreditCustomerPhone("");
@@ -257,7 +311,7 @@ export default function PosPage() {
     scanInputRef.current?.focus();
   };
 
-  // Financial Calculations
+  // Financial Calculations with Exchange Credit & GST
   const subtotal = useMemo(() => {
     return cart.reduce((acc, item) => acc + item.quantity * item.unitPrice, 0);
   }, [cart]);
@@ -266,7 +320,9 @@ export default function PosPage() {
     return (subtotal * discountPercent) / 100;
   }, [subtotal, discountPercent]);
 
-  const grandTotal = Math.max(0, subtotal - discountAmount);
+  const exchangeCreditAmount = exchangeCredit?.amount || 0;
+
+  const grandTotal = Math.max(0, subtotal - discountAmount - exchangeCreditAmount);
 
   const changeDue =
     typeof tenderedAmount === "number" && tenderedAmount >= grandTotal
@@ -274,6 +330,161 @@ export default function PosPage() {
       : 0;
 
   const totalItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Indian GST Tax Grouping Calculation (MRP-Inclusive)
+  const gstBreakdown = useMemo(() => {
+    const groups: Record<
+      string,
+      {
+        hsnCode: string;
+        gstRate: number;
+        taxableValue: number;
+        cgstAmount: number;
+        sgstAmount: number;
+        totalTax: number;
+      }
+    > = {};
+
+    cart.forEach((item) => {
+      const lineTotal = item.quantity * item.unitPrice;
+      const rate = item.gstRate || 0;
+      const hsn = item.hsnCode || "GENERIC";
+      const key = `${hsn}-${rate}`;
+
+      let taxable = lineTotal;
+      let tax = 0;
+      if (rate > 0) {
+        taxable = lineTotal / (1 + rate / 100);
+        tax = lineTotal - taxable;
+      }
+
+      if (!groups[key]) {
+        groups[key] = {
+          hsnCode: hsn,
+          gstRate: rate,
+          taxableValue: 0,
+          cgstAmount: 0,
+          sgstAmount: 0,
+          totalTax: 0,
+        };
+      }
+
+      groups[key].taxableValue += taxable;
+      groups[key].totalTax += tax;
+    });
+
+    let totalTaxable = 0;
+    let totalTax = 0;
+    const list = Object.values(groups).map((g) => {
+      const cgst = Math.round((g.totalTax / 2) * 100) / 100;
+      const sgst = Math.round((g.totalTax - cgst) * 100) / 100;
+      totalTaxable += g.taxableValue;
+      totalTax += g.totalTax;
+      return {
+        ...g,
+        taxableValue: Math.round(g.taxableValue * 100) / 100,
+        cgstAmount: cgst,
+        sgstAmount: sgst,
+        totalTax: Math.round(g.totalTax * 100) / 100,
+      };
+    });
+
+    return {
+      groups: list,
+      totalTaxable: Math.round(totalTaxable * 100) / 100,
+      totalTax: Math.round(totalTax * 100) / 100,
+      cgstTotal: Math.round((totalTax / 2) * 100) / 100,
+      sgstTotal: Math.round((totalTax - Math.round((totalTax / 2) * 100) / 100) * 100) / 100,
+    };
+  }, [cart]);
+
+  // Load sale details for Return / Exchange flow
+  const handleLoadReturnSale = async (saleIdToLoad: string) => {
+    const cleanId = saleIdToLoad.trim().replace(/^ORD-/i, "");
+    if (!cleanId) return;
+
+    setIsLoadingSale(true);
+    setErrorMessage("");
+    try {
+      const saleData = await apiClient.get<Sale>(`/api/sales/${cleanId}`);
+      if (saleData && saleData.id) {
+        setSelectedReturnSale(saleData);
+        setReturnItemSelections({});
+      } else {
+        setErrorMessage(`Sale #${saleIdToLoad} not found.`);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || `Invoice '${saleIdToLoad}' not found.`);
+    } finally {
+      setIsLoadingSale(false);
+    }
+  };
+
+  // Process Return / Refund / Exchange submission
+  const handleProcessReturnSubmit = async (mode: "cash" | "exchange_credit") => {
+    if (!selectedReturnSale) return;
+
+    const itemsToReturn = Object.entries(returnItemSelections)
+      .filter(([_, qty]) => qty > 0)
+      .map(([saleItemId, quantity]) => {
+        const effectiveReason =
+          returnReason === "Other" && customReturnReason.trim()
+            ? customReturnReason.trim()
+            : returnReason;
+        return {
+          saleItemId,
+          quantity,
+          reason: effectiveReason,
+        };
+      });
+
+    if (itemsToReturn.length === 0) {
+      setErrorMessage("Please select at least 1 item quantity to return.");
+      return;
+    }
+
+    try {
+      const result = await processReturnMutation.mutateAsync({
+        saleId: selectedReturnSale.id,
+        refundMode: mode,
+        items: itemsToReturn,
+      });
+
+      if (mode === "exchange_credit") {
+        // Apply credit to current active POS bill
+        const desc = result.items.map((i) => `${i.productName} x${i.quantity}`).join(", ");
+        setExchangeCredit({
+          saleId: selectedReturnSale.id,
+          amount: result.totalRefundAmount,
+          itemsDescription: desc,
+        });
+        setIsReturnModalOpen(false);
+        setSelectedReturnSale(null);
+        setReturnItemSelections({});
+        setScanStatus(`✓ Exchange credit ₹${result.totalRefundAmount.toFixed(2)} applied to current bill!`);
+        setTimeout(() => setScanStatus(null), 3500);
+      } else {
+        // Cash refund mode: Show Refund Voucher
+        setRefundVoucher({
+          saleId: selectedReturnSale.id,
+          refundMode: "cash",
+          totalRefundAmount: result.totalRefundAmount,
+          items: result.items.map((i) => ({
+            productName: i.productName,
+            quantity: i.quantity,
+            refundAmount: i.refundAmount,
+          })),
+          date: new Date().toLocaleString(),
+        });
+        setIsReturnModalOpen(false);
+        setSelectedReturnSale(null);
+        setReturnItemSelections({});
+      }
+      refetchSales();
+    } catch (err: any) {
+      setErrorMessage(err.message || "Failed to process return. Please verify item quantities.");
+    }
+  };
 
   // Process barcode from either manual input or camera scanner
   const processBarcode = async (rawCode: string) => {
@@ -348,6 +559,8 @@ export default function PosPage() {
           name: prefilledName,
           price: "",
           costPrice: "",
+          hsnCode: "",
+          gstRate: "18",
           isSaving: false,
         });
         setScanStatus(prefilledName ? `✓ Identified '${prefilledName}'` : `Item '${code}' not in catalog`);
@@ -359,6 +572,8 @@ export default function PosPage() {
         name: "",
         price: "",
         costPrice: "",
+        hsnCode: "",
+        gstRate: "18",
         isSaving: false,
       });
       setScanStatus(`Item '${code}' not in catalog`);
@@ -381,6 +596,8 @@ export default function PosPage() {
     const name = quickAddItem.name.trim() || `Item ${quickAddItem.barcode.slice(-4)}`;
     const price = parseFloat(quickAddItem.price) || 0;
     const cost = parseFloat(quickAddItem.costPrice) || 0;
+    const hsn = quickAddItem.hsnCode.trim() || null;
+    const rate = quickAddItem.gstRate ? Number(quickAddItem.gstRate) : 18;
 
     if (price <= 0) {
       setErrorMessage("Please enter a valid selling price greater than 0.");
@@ -399,6 +616,8 @@ export default function PosPage() {
           barcode: quickAddItem.barcode,
           sellingPrice: price,
           costPrice: cost,
+          hsnCode: hsn,
+          gstRate: rate,
           initialStock: 25,
           isActive: true,
         });
@@ -412,6 +631,8 @@ export default function PosPage() {
           barcode: quickAddItem.barcode,
           sellingPrice: price,
           costPrice: cost,
+          hsnCode: hsn,
+          gstRate: rate,
         });
       }
 
@@ -429,6 +650,8 @@ export default function PosPage() {
         barcode: quickAddItem.barcode,
         sellingPrice: price,
         costPrice: cost,
+        hsnCode: hsn,
+        gstRate: rate,
       });
       setQuickAddItem(null);
     }
@@ -468,7 +691,11 @@ export default function PosPage() {
           paymentMethod === "card" && cardReference ? ` (Ref: ${cardReference})` : ""
         }${paymentMethod === "upi" ? " (UPI QR)" : ""}${
           tenderedAmount ? ` | Tendered: ${currency}${tenderedAmount}` : ""
-        }${creditCustomerName ? ` | Khata: ${creditCustomerName} (${creditCustomerPhone || "No Phone"})` : ""}`,
+        }${creditCustomerName ? ` | Khata: ${creditCustomerName} (${creditCustomerPhone || "No Phone"})` : ""}${
+          exchangeCredit
+            ? ` | Exchange Credit Applied: -${currency}${exchangeCredit.amount.toFixed(2)} (Bill #${exchangeCredit.saleId.slice(0, 8)})`
+            : ""
+        }`,
       };
 
       const res = await createSaleMutation.mutateAsync(payload);
@@ -493,10 +720,19 @@ export default function PosPage() {
         saleDate: new Date().toLocaleString(),
         tenderedAmount: typeof tenderedAmount === "number" ? tenderedAmount : undefined,
         changeAmount: changeDue,
+        cgstAmount: gstBreakdown.cgstTotal,
+        sgstAmount: gstBreakdown.sgstTotal,
+        totalTax: gstBreakdown.totalTax,
+        taxableAmount: gstBreakdown.totalTaxable,
+        exchangeCreditAmount: exchangeCredit?.amount || 0,
+        exchangeCreditSaleId: exchangeCredit?.saleId || undefined,
+        gstGroups: gstBreakdown.groups,
       });
 
-      // Clear cart
+      // Clear cart and exchange credit
       setCart([]);
+      setDiscountPercent(0);
+      setExchangeCredit(null);
       setTenderedAmount("");
       setCreditCustomerName("");
       setCreditCustomerPhone("");
@@ -526,6 +762,20 @@ export default function PosPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setIsReturnModalOpen(true);
+              setReturnSearchInvoice("");
+              setSelectedReturnSale(null);
+              setReturnItemSelections({});
+              refetchSales();
+            }}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-[#1e1e28] hover:bg-[#282838] text-[#f5cf7b] border border-[#d4a853]/40 hover:border-[#d4a853] transition-all flex items-center gap-1.5 cursor-pointer shadow-sm active:scale-95"
+          >
+            <span>🔄</span>
+            <span>Return / Exchange</span>
+          </button>
           {cart.length > 0 && (
             <button
               onClick={clearCart}
@@ -707,6 +957,32 @@ export default function PosPage() {
               </span>
             </div>
 
+            {/* Exchange Credit Active Notice */}
+            {exchangeCredit && (
+              <div className="my-2 p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-between text-xs">
+                <div className="min-w-0 pr-2">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                    <span>🔄 Exchange Credit Applied</span>
+                  </div>
+                  <div className="text-[10px] text-[#97979d] truncate">
+                    Invoice #{exchangeCredit.saleId.slice(0, 8).toUpperCase()} ({exchangeCredit.itemsDescription})
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="font-mono font-bold text-emerald-400">
+                    -{currency}{exchangeCredit.amount.toFixed(2)}
+                  </span>
+                  <button
+                    onClick={() => setExchangeCredit(null)}
+                    title="Remove exchange credit"
+                    className="text-[#71717a] hover:text-rose-400 p-1 cursor-pointer font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Cart Items List */}
             <div className="divide-y divide-white/5 my-2 max-h-[220px] overflow-y-auto pr-1">
               {cart.length === 0 ? (
@@ -719,7 +995,7 @@ export default function PosPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-[#f4f4f5] truncate">{item.productName}</p>
                       <p className="text-[10px] text-[#71717a] font-mono">
-                        {currency}{item.unitPrice.toFixed(2)} each
+                        {currency}{item.unitPrice.toFixed(2)} each {item.hsnCode ? `· HSN: ${item.hsnCode}` : ""}
                       </p>
                     </div>
 
@@ -787,6 +1063,23 @@ export default function PosPage() {
                   {discountAmount > 0 ? `-${currency}${discountAmount.toFixed(2)}` : `${currency}0.00`}
                 </span>
               </div>
+
+              {exchangeCredit && (
+                <div className="flex justify-between text-emerald-400 font-semibold">
+                  <span>Exchange Credit</span>
+                  <span className="font-mono">-{currency}{exchangeCredit.amount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* GST Tax Summary line */}
+              {cart.length > 0 && (
+                <div className="flex justify-between text-[#71717a] text-[10px]">
+                  <span>Incl. Indian GST (CGST+SGST):</span>
+                  <span className="font-mono text-[#d4a853]">
+                    {currency}{gstBreakdown.totalTax.toFixed(2)}
+                  </span>
+                </div>
+              )}
 
               {/* Amount to Pay Highlight */}
               <div className="p-2.5 rounded-xl bg-gradient-to-r from-[#d4a853]/15 to-transparent border border-[#d4a853]/30 flex items-center justify-between">
@@ -998,18 +1291,52 @@ export default function PosPage() {
                     className="w-full px-3 py-2 rounded-lg bg-[#0b0b0f] text-[#f4f4f5] border border-white/15 outline-none focus:border-[#d4a853] font-mono"
                   />
                 </div>
+                {isOwner && (
+                  <div>
+                    <label className="text-[10px] uppercase font-bold text-[#97979d] block mb-1">
+                      Cost Price (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={quickAddItem.costPrice}
+                      onChange={(e) => setQuickAddItem({ ...quickAddItem, costPrice: e.target.value })}
+                      placeholder="e.g. 15"
+                      className="w-full px-3 py-2 rounded-lg bg-[#0b0b0f] text-[#f4f4f5] border border-white/15 outline-none focus:border-[#d4a853] font-mono"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* GST Slab & HSN Input in Quick Add */}
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
                 <div>
                   <label className="text-[10px] uppercase font-bold text-[#97979d] block mb-1">
-                    Cost Price (Optional)
+                    GST Tax Slab
+                  </label>
+                  <select
+                    value={quickAddItem.gstRate}
+                    onChange={(e) => setQuickAddItem({ ...quickAddItem, gstRate: e.target.value })}
+                    className="w-full px-2 py-2 rounded-lg bg-[#0b0b0f] text-[#f4f4f5] border border-white/15 outline-none focus:border-[#d4a853] text-[11px] cursor-pointer"
+                  >
+                    <option value="0">0% — Nil GST</option>
+                    <option value="5">5% — Staples/Tea</option>
+                    <option value="12">12% — Butter/Chips</option>
+                    <option value="18">18% — FMCG/Soaps</option>
+                    <option value="28">28% — Aerated/Soda</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold text-[#97979d] block mb-1">
+                    HSN Code
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={quickAddItem.costPrice}
-                    onChange={(e) => setQuickAddItem({ ...quickAddItem, costPrice: e.target.value })}
-                    placeholder="e.g. 15"
-                    className="w-full px-3 py-2 rounded-lg bg-[#0b0b0f] text-[#f4f4f5] border border-white/15 outline-none focus:border-[#d4a853] font-mono"
+                    type="text"
+                    value={quickAddItem.hsnCode}
+                    onChange={(e) => setQuickAddItem({ ...quickAddItem, hsnCode: e.target.value })}
+                    placeholder="e.g. 1905, 3401"
+                    className="w-full px-3 py-2 rounded-lg bg-[#0b0b0f] text-[#f4f4f5] border border-white/15 outline-none focus:border-[#d4a853] font-mono text-[11px]"
                   />
                 </div>
               </div>
@@ -1037,10 +1364,10 @@ export default function PosPage() {
         </div>
       )}
 
-      {/* ─── Receipt Print Modal ─── */}
+      {/* ─── Receipt Print Modal (With Legal Indian GST Compliance Table) ─── */}
       {completedOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="w-full max-w-sm rounded-2xl bg-[#121218] border border-white/15 p-5 shadow-2xl relative font-mono text-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-[#121218] border border-white/15 p-5 shadow-2xl relative font-mono text-xs max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setCompletedOrder(null)}
               className="absolute top-4 right-4 text-[#71717a] hover:text-[#f4f4f5] p-1 cursor-pointer"
@@ -1052,17 +1379,26 @@ export default function PosPage() {
               <h2 className="text-sm font-black text-[#f4f4f5] uppercase tracking-wider">
                 {store?.name || "STOCKPILOT RETAIL"}
               </h2>
-              <p className="text-[10px] text-[#71717a] mt-0.5">Tax Invoice / Cash Memo</p>
-              <p className="text-[10px] text-[#71717a]">Order: ORD-{completedOrder.id.slice(0, 8).toUpperCase()}</p>
+              {store?.gstin && (
+                <p className="text-[10px] text-[#f5cf7b] font-bold tracking-wider mt-0.5 font-mono">
+                  GSTIN: {store.gstin}
+                </p>
+              )}
+              <p className="text-[10px] text-[#71717a] mt-0.5">TAX INVOICE / CASH MEMO</p>
+              <p className="text-[10px] text-[#71717a]">Invoice No: ORD-{completedOrder.id.slice(0, 8).toUpperCase()}</p>
               <p className="text-[10px] text-[#71717a]">{completedOrder.saleDate}</p>
             </div>
 
-            <div className="divide-y divide-dashed divide-white/10 my-2.5 max-h-40 overflow-y-auto pr-1">
+            {/* Sold Items with HSN Code & GST Slab */}
+            <div className="divide-y divide-dashed divide-white/10 my-2.5 max-h-36 overflow-y-auto pr-1">
               {completedOrder.items.map((it, idx) => (
                 <div key={idx} className="py-1.5 flex justify-between text-[11px]">
                   <div>
                     <span className="text-[#f4f4f5]">{it.productName}</span>
                     <span className="text-[#71717a] ml-1">x{it.quantity}</span>
+                    <span className="block text-[9px] text-[#97979d]">
+                      {it.hsnCode ? `HSN: ${it.hsnCode} · ` : ""}GST: {it.gstRate || 0}%
+                    </span>
                   </div>
                   <span className="font-bold text-[#f4f4f5]">
                     {currency}{(it.quantity * it.unitPrice).toFixed(2)}
@@ -1071,6 +1407,48 @@ export default function PosPage() {
               ))}
             </div>
 
+            {/* Indian GST Tax Breakdown Table */}
+            {completedOrder.gstGroups && completedOrder.gstGroups.length > 0 && (
+              <div className="my-2 p-2 rounded-lg bg-black/40 border border-white/10 text-[9px]">
+                <div className="font-bold text-[#f5cf7b] mb-1 uppercase tracking-wider flex justify-between">
+                  <span>GST Tax Breakdown</span>
+                  <span>(MRP Inclusive)</span>
+                </div>
+                <table className="w-full text-left font-mono">
+                  <thead>
+                    <tr className="text-[#71717a] border-b border-white/10 pb-0.5">
+                      <th className="py-0.5">HSN</th>
+                      <th className="py-0.5 text-right">Taxable</th>
+                      <th className="py-0.5 text-right">CGST</th>
+                      <th className="py-0.5 text-right">SGST</th>
+                      <th className="py-0.5 text-right">Tax</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-[#d4d4d8]">
+                    {completedOrder.gstGroups.map((g, idx) => (
+                      <tr key={idx}>
+                        <td className="py-0.5">{g.hsnCode}</td>
+                        <td className="py-0.5 text-right">{currency}{g.taxableValue.toFixed(2)}</td>
+                        <td className="py-0.5 text-right">{currency}{g.cgstAmount.toFixed(2)}</td>
+                        <td className="py-0.5 text-right">{currency}{g.sgstAmount.toFixed(2)}</td>
+                        <td className="py-0.5 text-right font-bold text-[#f5cf7b]">{currency}{g.totalTax.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-white/10 font-bold text-[#f4f4f5]">
+                      <td className="pt-1">Total</td>
+                      <td className="pt-1 text-right">{currency}{(completedOrder.taxableAmount || 0).toFixed(2)}</td>
+                      <td className="pt-1 text-right">{currency}{(completedOrder.cgstAmount || 0).toFixed(2)}</td>
+                      <td className="pt-1 text-right">{currency}{(completedOrder.sgstAmount || 0).toFixed(2)}</td>
+                      <td className="pt-1 text-right text-[#f5cf7b]">{currency}{(completedOrder.totalTax || 0).toFixed(2)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+
+            {/* Bill Summary */}
             <div className="pt-2 border-t border-dashed border-white/20 space-y-1 text-[11px]">
               <div className="flex justify-between text-[#97979d]">
                 <span>Subtotal:</span>
@@ -1082,22 +1460,28 @@ export default function PosPage() {
                   <span>-{currency}{completedOrder.discountAmount.toFixed(2)}</span>
                 </div>
               )}
+              {completedOrder.exchangeCreditAmount !== undefined && completedOrder.exchangeCreditAmount > 0 && (
+                <div className="flex justify-between text-emerald-400 font-bold">
+                  <span>Exchange Credit Applied:</span>
+                  <span>-{currency}{completedOrder.exchangeCreditAmount.toFixed(2)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm font-black text-[#d4a853] pt-1 border-t border-white/10">
-                <span>TOTAL:</span>
+                <span>NET TOTAL:</span>
                 <span>{currency}{completedOrder.totalAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-[#71717a] pt-1">
-                <span>Paid via:</span>
+                <span>Payment Mode:</span>
                 <span className="uppercase font-bold text-[#f4f4f5]">{completedOrder.paymentMethod}</span>
               </div>
               {completedOrder.tenderedAmount !== undefined && (
                 <>
                   <div className="flex justify-between text-[#71717a]">
-                    <span>Tendered:</span>
+                    <span>Cash Tendered:</span>
                     <span>{currency}{completedOrder.tenderedAmount.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-emerald-400 font-bold">
-                    <span>Change:</span>
+                    <span>Change Returned:</span>
                     <span>{currency}{(completedOrder.changeAmount || 0).toFixed(2)}</span>
                   </div>
                 </>
@@ -1107,9 +1491,9 @@ export default function PosPage() {
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => window.print()}
-                className="flex-1 py-2 rounded-xl font-bold bg-white/10 hover:bg-white/20 text-[#f4f4f5] transition-all cursor-pointer"
+                className="flex-1 py-2 rounded-xl font-bold bg-white/10 hover:bg-white/20 text-[#f4f4f5] transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                🖨️ Print
+                <span>🖨️</span> Print Invoice
               </button>
               <button
                 onClick={() => {
@@ -1118,7 +1502,406 @@ export default function PosPage() {
                 }}
                 className="flex-1 py-2 rounded-xl font-bold bg-[#d4a853] text-[#0c0c0e] hover:bg-[#e5b95c] transition-all cursor-pointer"
               >
-                New Bill
+                Next Customer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── RETURN & EXCHANGE FLOW MODAL ─── */}
+      {isReturnModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl rounded-2xl bg-[#121218] border border-white/15 p-5 shadow-2xl relative max-h-[92vh] flex flex-col">
+            <button
+              onClick={() => {
+                setIsReturnModalOpen(false);
+                setSelectedReturnSale(null);
+                setReturnItemSelections({});
+              }}
+              className="absolute top-4 right-4 text-[#71717a] hover:text-[#f4f4f5] p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+
+            {/* Modal Title */}
+            <div className="flex items-center gap-2.5 pb-3 border-b border-white/10">
+              <div className="w-8 h-8 rounded-lg bg-[#d4a853]/20 text-[#f5cf7b] flex items-center justify-center text-sm font-bold">
+                🔄
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-[#f4f4f5]">
+                  Returns, Refunds & Item Exchange Counter
+                </h2>
+                <p className="text-[11px] text-[#97979d]">
+                  Select past invoice, pick items to return, and disburse cash or adjust against exchange.
+                </p>
+              </div>
+            </div>
+
+            {/* ─── Step 1: Search or Pick Past Invoice ─── */}
+            {!selectedReturnSale && (
+              <div className="mt-4 flex-1 flex flex-col min-h-0">
+                {/* Search Bar */}
+                <div className="flex gap-2 mb-4">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={returnSearchInvoice}
+                      onChange={(e) => setReturnSearchInvoice(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && returnSearchInvoice.trim()) {
+                          handleLoadReturnSale(returnSearchInvoice.trim());
+                        }
+                      }}
+                      placeholder="Enter Invoice Number or Sale ID (e.g. ORD-1234ABCD)..."
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#0b0b0f] text-xs font-mono text-[#f4f4f5] border border-white/15 focus:border-[#d4a853] outline-none"
+                      autoFocus
+                    />
+                    {returnSearchInvoice && (
+                      <button
+                        onClick={() => setReturnSearchInvoice("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#71717a] hover:text-white"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={!returnSearchInvoice.trim() || isLoadingSale}
+                    onClick={() => handleLoadReturnSale(returnSearchInvoice.trim())}
+                    className="px-4 py-2.5 rounded-xl text-xs font-bold bg-[#d4a853] text-[#0c0c0e] hover:bg-[#e8be66] disabled:opacity-40 transition-all cursor-pointer"
+                  >
+                    {isLoadingSale ? "Searching..." : "🔍 Search Invoice"}
+                  </button>
+                </div>
+
+                {/* Recent Invoices Quick Picker */}
+                <div className="flex-1 min-h-0 flex flex-col">
+                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/5">
+                    <span className="text-[11px] font-bold uppercase text-[#71717a]">
+                      Or Pick From Recent Counter Invoices
+                    </span>
+                    <span className="text-[10px] text-[#97979d]">
+                      {recentSalesData?.items?.length || 0} recent sales
+                    </span>
+                  </div>
+
+                  <div className="divide-y divide-white/5 overflow-y-auto max-h-[360px] pr-1">
+                    {!recentSalesData?.items || recentSalesData.items.length === 0 ? (
+                      <div className="py-12 text-center text-xs text-[#71717a]">
+                        No recent sales found in this store.
+                      </div>
+                    ) : (
+                      recentSalesData.items.map((sale) => (
+                        <div
+                          key={sale.id}
+                          onClick={() => handleLoadReturnSale(sale.id)}
+                          className="py-2.5 px-3 rounded-xl hover:bg-white/[0.04] border border-transparent hover:border-white/10 flex items-center justify-between cursor-pointer transition-all group"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono font-bold text-[#f5cf7b] group-hover:underline">
+                                ORD-{sale.id.slice(0, 8).toUpperCase()}
+                              </span>
+                              <span className="text-[10px] text-[#71717a] font-mono">
+                                {sale.saleDate}
+                              </span>
+                              {sale.returnStatus && sale.returnStatus !== "none" && (
+                                <span
+                                  className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                                    sale.returnStatus === "full"
+                                      ? "bg-rose-500/20 text-rose-300"
+                                      : "bg-amber-500/20 text-amber-300"
+                                  }`}
+                                >
+                                  {sale.returnStatus.toUpperCase()} RETURNED
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-[#97979d] mt-0.5 truncate max-w-sm">
+                              {sale.items?.map((it) => `${it.productName} (x${it.quantity})`).join(", ")}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-xs font-mono font-bold text-[#f4f4f5]">
+                              {currency}{Number(sale.totalAmount).toFixed(2)}
+                            </span>
+                            <span className="block text-[10px] text-[#d4a853] font-medium group-hover:underline">
+                              Select & Return →
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Step 2: Invoice Loaded — Select Return Items & Mode ─── */}
+            {selectedReturnSale && (
+              <div className="mt-3 flex-1 flex flex-col min-h-0 overflow-y-auto pr-1">
+                {/* Invoice Bar */}
+                <div className="p-3 rounded-xl bg-white/[0.03] border border-white/10 flex items-center justify-between gap-3 text-xs mb-3">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-[#71717a] block">
+                      Active Invoice
+                    </span>
+                    <span className="font-mono font-bold text-[#f5cf7b]">
+                      ORD-{selectedReturnSale.id.slice(0, 8).toUpperCase()}
+                    </span>
+                    <span className="text-[11px] text-[#97979d] ml-2">
+                      ({selectedReturnSale.saleDate})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="text-[10px] text-[#71717a] block">Original Total</span>
+                      <span className="font-mono font-bold text-[#f4f4f5]">
+                        {currency}{Number(selectedReturnSale.totalAmount).toFixed(2)}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedReturnSale(null);
+                        setReturnItemSelections({});
+                      }}
+                      className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white/5 hover:bg-white/10 text-[#97979d] hover:text-white border border-white/10 cursor-pointer"
+                    >
+                      ← Back
+                    </button>
+                  </div>
+                </div>
+
+                {/* Items to Return List */}
+                <div className="flex-1 min-h-0 mb-3">
+                  <span className="text-[10px] uppercase font-bold text-[#71717a] block mb-1.5">
+                    Select Quantities to Return
+                  </span>
+                  <div className="divide-y divide-white/5 border border-white/10 rounded-xl overflow-hidden bg-[#0b0b0f]">
+                    {selectedReturnSale.items.map((it) => {
+                      const alreadyReturned = it.returnedQuantity || 0;
+                      const returnable = Math.max(0, it.quantity - alreadyReturned);
+                      const selectedQty = returnItemSelections[it.id] || 0;
+                      const refundValue = selectedQty * it.unitPrice;
+
+                      return (
+                        <div
+                          key={it.id}
+                          className={`p-3 flex items-center justify-between gap-3 text-xs ${
+                            selectedQty > 0 ? "bg-[#d4a853]/10" : ""
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-[#f4f4f5] truncate">{it.productName}</p>
+                            <div className="flex items-center gap-2 text-[10px] text-[#71717a] mt-0.5 font-mono">
+                              <span>Price: {currency}{it.unitPrice.toFixed(2)}</span>
+                              <span>·</span>
+                              <span>Sold: {it.quantity}</span>
+                              <span>·</span>
+                              <span>Returned: {alreadyReturned}</span>
+                              <span>·</span>
+                              <span className={returnable > 0 ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
+                                Returnable: {returnable}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Stepper */}
+                          {returnable > 0 ? (
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="flex items-center gap-1 bg-[#161620] border border-white/15 rounded-lg p-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setReturnItemSelections((prev) => ({
+                                      ...prev,
+                                      [it.id]: Math.max(0, (prev[it.id] || 0) - 1),
+                                    }));
+                                  }}
+                                  className="w-6 h-6 rounded flex items-center justify-center text-xs text-[#97979d] hover:bg-white/10 cursor-pointer"
+                                >
+                                  -
+                                </button>
+                                <span className="w-7 text-center font-mono text-xs font-bold text-[#f4f4f5]">
+                                  {selectedQty}
+                                </span>
+                                <button
+                                  type="button"
+                                  disabled={selectedQty >= returnable}
+                                  onClick={() => {
+                                    setReturnItemSelections((prev) => ({
+                                      ...prev,
+                                      [it.id]: Math.min(returnable, (prev[it.id] || 0) + 1),
+                                    }));
+                                  }}
+                                  className="w-6 h-6 rounded flex items-center justify-center text-xs text-[#97979d] hover:bg-white/10 disabled:opacity-30 cursor-pointer"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <div className="w-16 text-right font-mono font-bold text-[#f5cf7b]">
+                                {currency}{refundValue.toFixed(2)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded font-mono">
+                              Fully Returned
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Return Reason Selector */}
+                <div className="p-3 rounded-xl bg-white/[0.02] border border-white/8 space-y-2 mb-3 text-xs">
+                  <label className="text-[10px] uppercase font-bold text-[#71717a] block">
+                    Reason for Return / Exchange
+                  </label>
+                  <select
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-[#0b0b0f] text-[#f4f4f5] border border-white/15 outline-none focus:border-[#d4a853] cursor-pointer"
+                  >
+                    <option value="Customer exchange / changed mind">Customer exchange / changed mind</option>
+                    <option value="Defective or damaged product">Defective or damaged product</option>
+                    <option value="Wrong item or size purchased">Wrong item or size purchased</option>
+                    <option value="Expired / near shelf-life">Expired / near shelf-life</option>
+                    <option value="Other">Other (specify below)</option>
+                  </select>
+                  {returnReason === "Other" && (
+                    <input
+                      type="text"
+                      value={customReturnReason}
+                      onChange={(e) => setCustomReturnReason(e.target.value)}
+                      placeholder="Specify reason..."
+                      className="w-full px-3 py-1.5 rounded-lg bg-[#0b0b0f] text-[#f4f4f5] border border-white/15 outline-none focus:border-[#d4a853] text-xs"
+                    />
+                  )}
+                </div>
+
+                {/* Live Return Total & Action Buttons */}
+                {(() => {
+                  const totalSelectedQty = Object.values(returnItemSelections).reduce((a, b) => a + b, 0);
+                  const totalRefundVal = selectedReturnSale.items.reduce((sum, item) => {
+                    const q = returnItemSelections[item.id] || 0;
+                    return sum + q * item.unitPrice;
+                  }, 0);
+
+                  return (
+                    <div className="p-3 rounded-xl bg-gradient-to-r from-[#d4a853]/15 to-transparent border border-[#d4a853]/30 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-[#d4a853] block">
+                          Total Return / Credit Value
+                        </span>
+                        <div className="text-xl font-black text-[#f4f4f5] font-mono leading-none mt-0.5">
+                          {currency}{totalRefundVal.toFixed(2)}
+                          <span className="text-xs font-normal text-[#97979d] ml-2">
+                            ({totalSelectedQty} {totalSelectedQty === 1 ? "unit" : "units"} to restock)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        {/* Option A: Cash Refund */}
+                        <button
+                          type="button"
+                          disabled={totalSelectedQty === 0 || processReturnMutation.isPending}
+                          onClick={() => handleProcessReturnSubmit("cash")}
+                          className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold bg-[#1e1e28] hover:bg-[#282838] text-amber-300 border border-amber-500/30 hover:border-amber-400 disabled:opacity-40 transition-all cursor-pointer text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                        >
+                          <span>💵</span>
+                          <span>Refund Cash ({currency}{totalRefundVal.toFixed(2)})</span>
+                        </button>
+
+                        {/* Option B: Apply to Current Bill as Exchange */}
+                        <button
+                          type="button"
+                          disabled={totalSelectedQty === 0 || processReturnMutation.isPending}
+                          onClick={() => handleProcessReturnSubmit("exchange_credit")}
+                          className="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl font-bold bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] disabled:opacity-40 transition-all cursor-pointer text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95"
+                        >
+                          <span>🔁</span>
+                          <span>Exchange in Current Bill</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─── CASH REFUND VOUCHER MODAL (Printed When Direct Cash Refund Given) ─── */}
+      {refundVoucher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-sm rounded-2xl bg-[#121218] border border-amber-500/30 p-5 shadow-2xl relative font-mono text-xs">
+            <button
+              onClick={() => setRefundVoucher(null)}
+              className="absolute top-4 right-4 text-[#71717a] hover:text-[#f4f4f5] p-1 cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="text-center pb-3 border-b border-dashed border-white/20">
+              <h2 className="text-sm font-black text-[#f4f4f5] uppercase tracking-wider">
+                {store?.name || "STOCKPILOT RETAIL"}
+              </h2>
+              <p className="text-[11px] font-bold text-amber-400 mt-1 uppercase">
+                💵 CASH REFUND VOUCHER
+              </p>
+              <p className="text-[10px] text-[#71717a]">Original Invoice: ORD-{refundVoucher.saleId.slice(0, 8).toUpperCase()}</p>
+              <p className="text-[10px] text-[#71717a]">{refundVoucher.date}</p>
+            </div>
+
+            <div className="divide-y divide-dashed divide-white/10 my-3">
+              <div className="text-[10px] uppercase font-bold text-[#71717a] pb-1">
+                Restocked Items to Shelf:
+              </div>
+              {refundVoucher.items.map((it, idx) => (
+                <div key={idx} className="py-1.5 flex justify-between text-[11px]">
+                  <div>
+                    <span className="text-[#f4f4f5]">{it.productName}</span>
+                    <span className="text-[#71717a] ml-1">x{it.quantity}</span>
+                  </div>
+                  <span className="font-bold text-amber-400">
+                    {currency}{it.refundAmount.toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-center my-3">
+              <span className="text-[10px] uppercase font-bold text-amber-300 block">
+                Cash to Disburse to Customer
+              </span>
+              <span className="text-2xl font-black text-[#f4f4f5] font-mono mt-1 block">
+                {currency}{refundVoucher.totalRefundAmount.toFixed(2)}
+              </span>
+              <span className="text-[10px] text-[#97979d] mt-1 block">
+                Please disburse from counter cash drawer. Stock has been returned to inventory.
+              </span>
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => window.print()}
+                className="flex-1 py-2 rounded-xl font-bold bg-white/10 hover:bg-white/20 text-[#f4f4f5] transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>🖨️</span> Print Voucher
+              </button>
+              <button
+                onClick={() => setRefundVoucher(null)}
+                className="flex-1 py-2 rounded-xl font-bold bg-[#d4a853] text-[#0c0c0e] hover:bg-[#e5b95c] transition-all cursor-pointer"
+              >
+                Done
               </button>
             </div>
           </div>

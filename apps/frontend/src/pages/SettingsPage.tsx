@@ -1,11 +1,11 @@
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../lib/authContext";
 import { useStoreSettings, useUpdateStoreSettings, useChangePassword } from "../hooks/useSettings";
-import { ApiError } from "../lib/apiClient";
+import { apiClient, ApiError } from "../lib/apiClient";
 import LoadingState from "../components/states/LoadingState";
 
-type TabId = "general" | "security" | "inventory" | "notifications" | "integrations" | "data";
+type TabId = "general" | "security" | "team" | "inventory" | "notifications" | "integrations" | "data";
 
 const TIMEZONES = [
   { value: "UTC", label: "UTC (Coordinated Universal Time)" },
@@ -41,7 +41,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab") as TabId;
-    if (tabParam && ["general", "security", "inventory", "notifications", "integrations", "data"].includes(tabParam)) {
+    if (tabParam && ["general", "security", "team", "inventory", "notifications", "integrations", "data"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [searchParams]);
@@ -55,6 +55,7 @@ export default function SettingsPage() {
   const [storeName, setStoreName] = useState("");
   const [timezone, setTimezone] = useState("UTC");
   const [currency, setCurrency] = useState("INR");
+  const [gstin, setGstin] = useState("");
   const [generalSuccess, setGeneralSuccess] = useState(false);
   const [generalError, setGeneralError] = useState<string | null>(null);
 
@@ -64,6 +65,7 @@ export default function SettingsPage() {
       setStoreName(store.name || "");
       setTimezone(store.timezone || "UTC");
       setCurrency(store.currency || "INR");
+      setGstin(store.gstin || "");
     }
   }, [store]);
 
@@ -126,6 +128,7 @@ export default function SettingsPage() {
         name: storeName.trim(),
         timezone,
         currency,
+        gstin: gstin.trim().toUpperCase() || undefined,
       });
       setGeneralSuccess(true);
       setTimeout(() => setGeneralSuccess(false), 3500);
@@ -169,6 +172,89 @@ export default function SettingsPage() {
       } else {
         setPasswordError("Failed to update password. Verify your current password.");
       }
+    }
+  };
+
+  // ─── Team / Staff Members State ───
+  const [teamMembers, setTeamMembers] = useState<
+    Array<{ id: string; email: string; role: string; createdAt: string }>
+  >([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [newCashierEmail, setNewCashierEmail] = useState("");
+  const [newCashierPassword, setNewCashierPassword] = useState("");
+  const [createCashierLoading, setCreateCashierLoading] = useState(false);
+  const [createCashierError, setCreateCashierError] = useState<string | null>(null);
+  const [createCashierSuccess, setCreateCashierSuccess] = useState<string | null>(null);
+  const [deleteCashierLoadingId, setDeleteCashierLoadingId] = useState<string | null>(null);
+
+  const loadTeam = useCallback(async () => {
+    setTeamLoading(true);
+    try {
+      const data = await apiClient.get<Array<{ id: string; email: string; role: string; createdAt: string }>>(
+        "/api/auth/team"
+      );
+      setTeamMembers(Array.isArray(data) ? data : (data as any)?.team || []);
+    } catch {
+      // Handled silently
+    } finally {
+      setTeamLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "team") {
+      loadTeam();
+    }
+  }, [activeTab, loadTeam]);
+
+  const handleCreateCashier = async (e: FormEvent) => {
+    e.preventDefault();
+    setCreateCashierError(null);
+    setCreateCashierSuccess(null);
+
+    if (!newCashierEmail || !newCashierPassword) {
+      setCreateCashierError("Both email and password are required.");
+      return;
+    }
+    if (newCashierPassword.length < 8) {
+      setCreateCashierError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setCreateCashierLoading(true);
+    try {
+      await apiClient.post("/api/auth/team/cashier", {
+        email: newCashierEmail,
+        password: newCashierPassword,
+      });
+      setCreateCashierSuccess(`Cashier login for ${newCashierEmail} created successfully!`);
+      setNewCashierEmail("");
+      setNewCashierPassword("");
+      await loadTeam();
+      setTimeout(() => setCreateCashierSuccess(null), 5000);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setCreateCashierError(err.message);
+      } else {
+        setCreateCashierError("Failed to create cashier login.");
+      }
+    } finally {
+      setCreateCashierLoading(false);
+    }
+  };
+
+  const handleDeleteCashier = async (memberId: string, memberEmail: string) => {
+    if (!window.confirm(`Are you sure you want to remove cashier login for ${memberEmail}?`)) {
+      return;
+    }
+    setDeleteCashierLoadingId(memberId);
+    try {
+      await apiClient.delete(`/api/auth/team/${memberId}`);
+      await loadTeam();
+    } catch (err: any) {
+      alert(err.message || "Failed to remove cashier");
+    } finally {
+      setDeleteCashierLoadingId(null);
     }
   };
 
@@ -256,6 +342,16 @@ export default function SettingsPage() {
       icon: (
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
+    },
+    {
+      id: "team",
+      label: "Store Staff & Cashiers",
+      description: "Counter logins & POS permissions",
+      icon: (
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
     },
@@ -459,6 +555,27 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {/* Indian GSTIN Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-[#e8e6e3]">
+                      🇮🇳 GSTIN (Goods & Services Tax Identification Number)
+                    </label>
+                    <span className="text-[10px] text-[#d4a853] font-mono">15 Characters</span>
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={15}
+                    value={gstin}
+                    onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                    placeholder="e.g. 24AAAAA0000A1Z5"
+                    className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] font-mono tracking-wider border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853] transition-colors uppercase"
+                  />
+                  <span className="text-[11px] text-[#71717a] mt-1 block">
+                    Your official 15-character Indian GSTIN will be automatically printed on all legal tax invoices and POS receipts.
+                  </span>
+                </div>
+
                 {/* Readonly Store Info */}
                 <div className="p-4 rounded-xl bg-[#0b0b0f] border border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-[#97979d]">
                   <div>
@@ -626,6 +743,204 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          )}
+
+          {/* ═══════════════════════════════════════════ */}
+          {/* TAB 2.5: STORE STAFF & CASHIERS (RBAC)      */}
+          {/* ═══════════════════════════════════════════ */}
+          {activeTab === "team" && (
+            <div className="space-y-6">
+              {/* RBAC Rules Banner */}
+              <div className="p-5 rounded-2xl bg-[#14141a] border border-[#d4a853]/20 shadow-xl">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#d4a853]/15 border border-[#d4a853]/30 flex items-center justify-center text-sm shrink-0 mt-0.5">
+                    🛡️
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#f4f4f5]">
+                      Role-Based Access Control (Dukan Security Rules)
+                    </h3>
+                    <p className="text-xs text-[#97979d] mt-1 leading-relaxed">
+                      Cashier / Helper boys counter par baith kar sirf billing kar sakte hain. Wholesale purchase cost price (maal kitne mein khareeda) aur store ka total profit margin unhe kabhi nahi dikhta. Purani sales modify ya delete karna unke liye blocked hai.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-mono">
+                      <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-300">
+                        👑 OWNER: Full 30+ Features & Analytics Access
+                      </span>
+                      <span className="px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-300">
+                        🛒 CASHIER: POS Billing Only • Costs & Profit Hidden
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Add New Cashier Form */}
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#d4a853]" />
+                  <h3 className="text-base font-bold text-[#f4f4f5]">
+                    Create Cashier Counter Login
+                  </h3>
+                </div>
+                <p className="text-xs text-[#97979d]">
+                  Set up a secure login for your counter staff or shop helper boy.
+                </p>
+
+                {createCashierSuccess && (
+                  <div className="mt-4 p-3.5 rounded-xl bg-[#4aba7a]/15 border border-[#4aba7a]/30 text-xs text-[#4aba7a] flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#4aba7a]" />
+                    <span>{createCashierSuccess}</span>
+                  </div>
+                )}
+
+                {createCashierError && (
+                  <div className="mt-4 p-3.5 rounded-xl bg-[#d45a4a]/15 border border-[#d45a4a]/30 text-xs text-[#f87171]">
+                    {createCashierError}
+                  </div>
+                )}
+
+                <form onSubmit={handleCreateCashier} className="mt-5 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
+                        Cashier Email ID
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={newCashierEmail}
+                        onChange={(e) => setNewCashierEmail(e.target.value)}
+                        placeholder="cashier.rahul@store.com"
+                        className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#e8e6e3] mb-1.5">
+                        Password (Min 8 Characters)
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        value={newCashierPassword}
+                        onChange={(e) => setNewCashierPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        className="w-full px-4 py-2.5 rounded-xl text-xs bg-[#0b0b0f] text-[#f4f4f5] border border-white/10 focus:outline-none focus:border-[#d4a853] focus:ring-1 focus:ring-[#d4a853]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={createCashierLoading}
+                      className="px-6 py-2.5 rounded-xl text-xs font-semibold text-[#0c0c0e] bg-gradient-to-r from-[#d4a853] to-[#f5cf7b] hover:scale-[1.02] active:scale-100 transition-all disabled:opacity-50 shadow-md cursor-pointer flex items-center gap-1.5"
+                    >
+                      {createCashierLoading ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                          <span>Creating Cashier Login...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>➕ Create Cashier Login</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Current Team Members Table */}
+              <div className="p-6 md:p-8 rounded-2xl bg-[#121218] border border-white/8 shadow-2xl">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#4aba7a]" />
+                      <h3 className="text-base font-bold text-[#f4f4f5]">
+                        Active Store Logins
+                      </h3>
+                    </div>
+                    <p className="text-xs text-[#97979d]">
+                      Accounts authorized to access this store environment.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={loadTeam}
+                    disabled={teamLoading}
+                    className="px-3 py-1.5 rounded-lg text-xs font-mono text-[#d4a853] bg-[#d4a853]/10 hover:bg-[#d4a853]/20 border border-[#d4a853]/30 transition-all cursor-pointer"
+                  >
+                    {teamLoading ? "Refreshing..." : "↻ Refresh List"}
+                  </button>
+                </div>
+
+                <div className="mt-4 border border-white/8 rounded-xl overflow-hidden bg-[#0b0b0f]">
+                  <table className="w-full text-left text-xs font-mono">
+                    <thead className="bg-[#14141a] text-[#97979d] border-b border-white/8 text-[11px] uppercase tracking-wider">
+                      <tr>
+                        <th className="px-5 py-3">User Email</th>
+                        <th className="px-5 py-3">Role</th>
+                        <th className="px-5 py-3">Access Level</th>
+                        <th className="px-5 py-3">Created Date</th>
+                        <th className="px-5 py-3 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {teamMembers.map((member) => {
+                        const isSelf = member.id === user?.id;
+                        const isOwnerRole = member.role === "owner";
+                        return (
+                          <tr key={member.id} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="px-5 py-3.5 text-[#f4f4f5] font-semibold flex items-center gap-2">
+                              <span>{member.email}</span>
+                              {isSelf && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/10 text-white font-normal">
+                                  You
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5">
+                              {isOwnerRole ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                  👑 OWNER
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                  🛒 CASHIER
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5 text-[#97979d]">
+                              {isOwnerRole ? "Full Store + Financials" : "Counter POS Only (Costs Hidden)"}
+                            </td>
+                            <td className="px-5 py-3.5 text-[#71717a]">
+                              {new Date(member.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              {isOwnerRole ? (
+                                <span className="text-[10px] text-[#71717a] italic">Primary Account</span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled={deleteCashierLoadingId === member.id}
+                                  onClick={() => handleDeleteCashier(member.id, member.email)}
+                                  className="px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-400 hover:text-white bg-rose-500/10 hover:bg-rose-500 border border-rose-500/25 transition-all cursor-pointer disabled:opacity-50"
+                                >
+                                  {deleteCashierLoadingId === member.id ? "Deleting..." : "Delete Login"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

@@ -15,6 +15,8 @@ export interface Product {
   barcode: string | null;
   costPrice: string;
   sellingPrice: string;
+  hsnCode?: string | null;
+  gstRate?: string | number | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +63,8 @@ export interface InventoryItem {
   categoryId?: string | null;
   costPrice?: number;
   sellingPrice?: number;
+  hsnCode?: string | null;
+  gstRate?: number | string | null;
   currentStock: number;
   minStock: number;
   safetyStock: number;
@@ -266,6 +270,7 @@ export interface Store {
   name: string;
   timezone: string;
   currency: string;
+  gstin?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -274,6 +279,7 @@ export interface UpdateStoreInput {
   name?: string;
   timezone?: string;
   currency?: string;
+  gstin?: string;
 }
 
 export interface ChangePasswordInput {
@@ -380,6 +386,9 @@ export interface SaleLineItem {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  hsnCode?: string | null;
+  gstRate?: number | string | null;
+  taxAmount?: number | null;
   returnedQuantity?: number;
 }
 
@@ -389,11 +398,41 @@ export interface Sale {
   importId?: string | null;
   saleDate: string;
   totalAmount: number;
+  cgstAmount?: number;
+  sgstAmount?: number;
+  totalTax?: number;
   createdAt: string;
   items: SaleLineItem[];
   totalUnits: number;
   notes?: string | null;
   returnStatus?: "none" | "partial" | "full";
+}
+
+export interface ProcessReturnItemInput {
+  saleItemId: string;
+  quantity: number;
+  reason?: string;
+}
+
+export interface ProcessReturnInput {
+  saleId: string;
+  refundMode: "cash" | "exchange_credit";
+  items: ProcessReturnItemInput[];
+}
+
+export interface ProcessReturnResult {
+  saleId: string;
+  refundMode: "cash" | "exchange_credit";
+  totalRefundAmount: number;
+  items: {
+    saleItemId: string;
+    productId: string;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    refundAmount: number;
+    reason?: string;
+  }[];
 }
 
 export interface SalesMetrics {

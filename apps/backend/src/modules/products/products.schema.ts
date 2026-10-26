@@ -7,6 +7,8 @@ export const createProductSchema = z.object({
   categoryId: z.string().uuid().optional().nullable(),
   costPrice: z.number().nonnegative(),
   sellingPrice: z.number().nonnegative(),
+  hsnCode: z.string().max(20).optional().nullable(),
+  gstRate: z.number().min(0).max(100).optional().nullable(),
   isActive: z.boolean().optional(),
   initialStock: z.number().int().nonnegative().optional(),
   minStock: z.number().int().nonnegative().optional(),

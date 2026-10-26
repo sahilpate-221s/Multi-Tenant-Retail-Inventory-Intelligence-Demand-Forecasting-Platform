@@ -1,11 +1,14 @@
 import { Request, Response } from "express";
-import { registerSchema, loginSchema, changePasswordSchema } from "./auth.schema";
+import { registerSchema, loginSchema, changePasswordSchema, createCashierSchema } from "./auth.schema";
 import {
   registerStoreAndOwner,
   loginWithCredentials,
   refreshSession,
   revokeRefreshToken,
   updateUserPassword,
+  listStoreTeam,
+  createCashierAccount,
+  removeCashierAccount,
   AuthError,
 } from "./auth.service";
 import { logAuditEvent } from "../audit/audit.service";
@@ -129,3 +132,52 @@ export async function changePassword(req: Request, res: Response) {
     return res.status(500).json(errorResponse(req, "INTERNAL_ERROR", "Failed to update password."));
   }
 }
+
+export async function getTeam(req: Request, res: Response) {
+  const storeId = req.auth?.storeId;
+  if (!storeId) {
+    return res.status(401).json(errorResponse(req, "UNAUTHORIZED", "Authentication required."));
+  }
+  const team = await listStoreTeam(storeId);
+  return res.status(200).json({ success: true, data: team });
+}
+
+export async function postCashier(req: Request, res: Response) {
+  const storeId = req.auth?.storeId;
+  if (!storeId) {
+    return res.status(401).json(errorResponse(req, "UNAUTHORIZED", "Authentication required."));
+  }
+  const parsed = createCashierSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json(errorResponse(req, "VALIDATION_ERROR", parsed.error.issues[0].message));
+  }
+  try {
+    const cashier = await createCashierAccount(storeId, parsed.data.email, parsed.data.password);
+    return res.status(201).json({ success: true, data: cashier });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return res.status(400).json(errorResponse(req, err.code, err.message));
+    }
+    console.error("Create cashier error:", err);
+    return res.status(500).json(errorResponse(req, "INTERNAL_ERROR", "Failed to create cashier account."));
+  }
+}
+
+export async function deleteCashier(req: Request, res: Response) {
+  const storeId = req.auth?.storeId;
+  if (!storeId) {
+    return res.status(401).json(errorResponse(req, "UNAUTHORIZED", "Authentication required."));
+  }
+  const userId = req.params.id as string;
+  try {
+    const result = await removeCashierAccount(storeId, userId);
+    return res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    if (err instanceof AuthError) {
+      return res.status(400).json(errorResponse(req, err.code, err.message));
+    }
+    console.error("Delete cashier error:", err);
+    return res.status(500).json(errorResponse(req, "INTERNAL_ERROR", "Failed to delete cashier."));
+  }
+}
+

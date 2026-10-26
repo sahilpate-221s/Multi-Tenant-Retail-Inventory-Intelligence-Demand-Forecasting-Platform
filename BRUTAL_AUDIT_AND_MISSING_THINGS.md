@@ -52,29 +52,25 @@ Ek asli retail store (Kirana, Supermarket, Medical, Garments) chalane wale dukaa
 
 ---
 
-### 1.3. Returns, Refunds & Item Exchange Flow — 🔴 P0 (Critical)
-* **Abhi Kya Hai:** Grahak saaman le gaya toh bas sale record ho gayi. Agar 2 ghante baad grahak bole *"Bhaiya 1 packet soap wapas lena hai aur badle mein shampoo dena hai"*, toh system mein direct Return/Exchange ka button nahi hai.
-* **Asli Dukan ki Problem:**
-  * Retail mein 10% log saaman badalwane aate hain.
-  * Agar return system mein nahi chadhega, toh:
-    1. Inventory stock galat ho jayega (wapas aaya soap stock mein count nahi hoga).
-    2. Galle ka cash mismatch ho jayega.
-* **Kya Chahiye:**
-  * POS screen par "Return / Exchange" button jahan purana Invoice No daalo, items select karo, aur refund cash do ya doosre item ke against adjust karo.
+### 1.3. Returns, Refunds & Item Exchange Flow — ✅ COMPLETED (Production Ready)
+* **Status:** Implemented on POS Counter Screen & Backend API (`POST /api/returns/process`).
+* **Built Capabilities:**
+  1. **POS Return / Exchange Button:** POS header par dedicated button jahan purana Invoice No search karo ya recent bills picker se select karo.
+  2. **Multi-Item Return with Quantities & Reasons:** Har item ka returnable quantity stepper (`quantity - alreadyReturned`), and reason code ("Customer exchange", "Defective/Damaged", "Wrong variant", etc.).
+  3. **Mode A — Direct Cash Refund:** Counter cash drawer se cash refund voucher generate karta hai aur stock wapas shelf par count kar deta hai.
+  4. **Mode B — Item Exchange in Current Bill:** Wapas aaye saaman ka credit active bill par apply ho jata hai (e.g. ₹50 soap return karke ₹185 shampoo lena, toh grahak ko sirf ₹135 net dena hoga).
+  5. **Inventory & Movement Ledger:** Inventory table mein `currentStock` turant restore hota hai aur `inventoryMovements` ledger mein `reason: "return"` log hota hai. Over-return prevention (HTTP 409) safeguards duplicate returns.
 
 ---
 
-### 1.4. Indian GST / Tax Slabs Compliance — 🟡 P1 (Important)
-* **Abhi Kya Hai:** Discount flat % par hai, aur tax generic hai.
-* **Asli Dukan ki Problem:**
-  * India mein har item par alag GST slab hota hai:
-    * Doodh, Atta, Dal = 0% (Nil GST)
-    * Ghee, Butter = 5% ya 12%
-    * Biscuits, Chocolates = 18%
-    * Soft drinks = 28%
-  * Bill par legal GST invoice ke liye **HSN Code**, **CGST** aur **SGST** ka alag-alag hisaab dikhna zaroori hota hai agar dukan registered hai.
-* **Kya Chahiye:**
-  * Product setup mein GST Slab dropdown (0%, 5%, 12%, 18%, 28%) aur HSN code input, aur receipt par tax summary table.
+### 1.4. Indian GST / Tax Slabs Compliance — ✅ COMPLETED (Production Ready)
+* **Status:** Implemented across Database Schema, Product Setup, POS Cart & Tax Invoices.
+* **Built Capabilities:**
+  1. **Indian GST Slabs Dropdown:** `0%` (Nil GST - Milk, Atta, Dal), `5%` (Edible Oil, Sugar, Tea), `12%` (Butter, Cheese, Chips), `18%` (Soaps, Biscuits, Toothpaste), `28%` (Aerated Soft Drinks).
+  2. **HSN / SAC Code:** Product creation modal, quick-add popup, and database schema mein HSN code support.
+  3. **Store GSTIN:** Store profile setup mein 15-character official Indian GSTIN (e.g. `24AAAAA0000A1Z5`).
+  4. **MRP-Inclusive GST Formula:** Real retail FMCG formula: $\text{Taxable} = \text{MRP} / (1 + \text{Rate}/100)$, $\text{Total GST} = \text{MRP} - \text{Taxable}$, $\text{CGST} = \text{GST} / 2$, $\text{SGST} = \text{GST} / 2$.
+  5. **Legal Tax Invoice Breakdown Table:** Bill receipt par legal HSN/SAC summary table showing Taxable Value, CGST Rate & Amount, SGST Rate & Amount, and Total Tax.
 
 ---
 
@@ -202,8 +198,8 @@ Ek asli retail store (Kirana, Supermarket, Medical, Garments) chalane wale dukaa
 | **P0 (Immediate)** | **Atomic Stock Decrement (Concurrency)** | Developer | 2 Hours | Stock kabhi negative nahi hoga, data 100% accurate |
 | **P0 (Immediate)** | **Cashier vs Owner Role (RBAC)** | User & Dev | 4 Hours | Cashier profit margin ya settings nahi dekh sakega |
 | **P0 (Immediate)** | **Raw Thermal Print (ESC/POS)** | User | 3 Hours | 1-second silent bill printing at counter |
-| **P1 (Next)** | **Return & Exchange on POS** | User | 5 Hours | Wapas aane wale saaman ka hisaab aur stock wapas judna |
-| **P1 (Next)** | **Indian GST Slabs & HSN Codes** | User | 4 Hours | Tax compliance aur legal tax invoice |
+| **Completed** | **Return & Exchange on POS (P0)** | User & Dev | Done ✅ | Multi-item returns, cash refund, exchange credit on live bill |
+| **Completed** | **Indian GST Slabs & HSN Codes (P1)** | User & Dev | Done ✅ | HSN codes, GSTIN, 0/5/12/18/28% slabs, legal tax invoice table |
 | **P1 (Next)** | **Offline PWA Sync (IndexedDB)** | User & Dev | 8 Hours | Net band hone par bhi dukaan nahi rukegi |
 | **P2 (Later)** | **WhatsApp Bill Sharing** | User | 3 Hours | Paper bachaega, customer delight |
 | **P2 (Later)** | **Playwright E2E Testing** | Developer | 4 Hours | Production stability guarantee |

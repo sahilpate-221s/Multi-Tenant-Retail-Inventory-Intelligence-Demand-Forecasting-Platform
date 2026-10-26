@@ -44,6 +44,8 @@ export function useCreateProduct() {
       categoryId?: string | null;
       costPrice: number;
       sellingPrice: number;
+      hsnCode?: string | null;
+      gstRate?: number | null;
       isActive?: boolean;
       initialStock?: number;
       minStock?: number;
@@ -68,6 +70,8 @@ export function useUpdateProduct() {
       categoryId?: string | null;
       costPrice: number;
       sellingPrice: number;
+      hsnCode?: string | null;
+      gstRate?: number | null;
       isActive: boolean;
     }>) => apiClient.patch<Product>(`/api/products/${id}`, input),
     onSuccess: () => {

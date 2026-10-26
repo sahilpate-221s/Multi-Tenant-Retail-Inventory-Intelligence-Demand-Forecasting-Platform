@@ -1,4 +1,4 @@
-import { eq, and, ilike, asc, desc, sql, SQL } from "drizzle-orm";
+import { eq, and, ilike, asc, desc, sql, SQL, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import { products, categories, inventory, inventoryMovements, supplierProducts, suppliers } from "../../db/schema";
 import type { CreateProductInput, UpdateProductInput, ListProductsQuery } from "./products.schema";
@@ -13,7 +13,7 @@ export class ProductError extends Error {
 
 async function assertCategoryBelongsToStore(storeId: string, categoryId: string) {
   const category = await db.query.categories.findFirst({
-    where: and(eq(categories.id, categoryId), eq(categories.storeId, storeId)),
+    where: and(eq(categories.id, categoryId), eq(categories.storeId, storeId), isNull(categories.deletedAt)),
   });
   if (!category) {
     throw new ProductError("Category not found for this store.", "INVALID_CATEGORY");
@@ -21,7 +21,7 @@ async function assertCategoryBelongsToStore(storeId: string, categoryId: string)
 }
 
 export async function listProducts(storeId: string, query: ListProductsQuery) {
-  const conditions: SQL[] = [eq(products.storeId, storeId)];
+  const conditions: SQL[] = [eq(products.storeId, storeId), isNull(products.deletedAt)];
 
   if (query.search) {
     conditions.push(ilike(products.name, `%${query.search}%`));
@@ -62,9 +62,13 @@ export async function listProducts(storeId: string, query: ListProductsQuery) {
   };
 }
 
-export async function getProductById(storeId: string, productId: string) {
+export async function getProductById(storeId: string, productId: string, includeDeleted = false) {
+  const conditions = [eq(products.id, productId), eq(products.storeId, storeId)];
+  if (!includeDeleted) {
+    conditions.push(isNull(products.deletedAt));
+  }
   return db.query.products.findFirst({
-    where: and(eq(products.id, productId), eq(products.storeId, storeId)),
+    where: and(...conditions),
   });
 }
 
@@ -72,13 +76,13 @@ export async function getProductByBarcode(storeId: string, code: string) {
   const trimmed = code.trim();
   // Try exact barcode match first
   let product = await db.query.products.findFirst({
-    where: and(eq(products.barcode, trimmed), eq(products.storeId, storeId)),
+    where: and(eq(products.barcode, trimmed), eq(products.storeId, storeId), isNull(products.deletedAt)),
   });
 
   // If not found by barcode, try SKU (case-insensitive)
   if (!product) {
     product = await db.query.products.findFirst({
-      where: and(ilike(products.sku, trimmed), eq(products.storeId, storeId)),
+      where: and(ilike(products.sku, trimmed), eq(products.storeId, storeId), isNull(products.deletedAt)),
     });
   }
 
@@ -101,6 +105,8 @@ export async function createProduct(storeId: string, input: CreateProductInput) 
         categoryId: input.categoryId ?? null,
         costPrice: input.costPrice.toString(),
         sellingPrice: input.sellingPrice.toString(),
+        hsnCode: input.hsnCode ?? null,
+        gstRate: input.gstRate !== undefined && input.gstRate !== null ? input.gstRate.toString() : "0.00",
         isActive: input.isActive ?? true,
       })
       .returning();
@@ -162,6 +168,8 @@ export async function updateProduct(
   const updateValues: Record<string, unknown> = { ...input, updatedAt: new Date() };
   if (input.costPrice !== undefined) updateValues.costPrice = input.costPrice.toString();
   if (input.sellingPrice !== undefined) updateValues.sellingPrice = input.sellingPrice.toString();
+  if (input.gstRate !== undefined) updateValues.gstRate = input.gstRate !== null ? input.gstRate.toString() : "0.00";
+  if (input.hsnCode !== undefined) updateValues.hsnCode = input.hsnCode ?? null;
 
   try {
     const [product] = await db
@@ -180,8 +188,13 @@ export async function updateProduct(
 
 export async function deleteProduct(storeId: string, productId: string) {
   const [deleted] = await db
-    .delete(products)
-    .where(and(eq(products.id, productId), eq(products.storeId, storeId)))
+    .update(products)
+    .set({
+      deletedAt: new Date(),
+      isActive: false,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(products.id, productId), eq(products.storeId, storeId), isNull(products.deletedAt)))
     .returning();
   return deleted ?? null;
 }

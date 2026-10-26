@@ -135,4 +135,62 @@ export async function updateUserPassword(userId: string, currentPassword: string
       updatedAt: new Date(),
     })
     .where(eq(users.id, userId));
-}
+}
+
+export async function listStoreTeam(storeId: string) {
+  const team = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+    })
+    .from(users)
+    .where(eq(users.storeId, storeId));
+  return team;
+}
+
+export async function createCashierAccount(storeId: string, email: string, password: string) {
+  const existing = await db.query.users.findFirst({
+    where: eq(users.email, email.trim().toLowerCase()),
+  });
+  if (existing) {
+    throw new AuthError("An account with this email already exists.", "EMAIL_TAKEN");
+  }
+
+  const passwordHash = await hashPassword(password);
+  const [cashier] = await db
+    .insert(users)
+    .values({
+      storeId,
+      email: email.trim().toLowerCase(),
+      passwordHash,
+      role: "cashier",
+    })
+    .returning({
+      id: users.id,
+      email: users.email,
+      role: users.role,
+      createdAt: users.createdAt,
+    });
+
+  return cashier;
+}
+
+export async function removeCashierAccount(storeId: string, userId: string) {
+  const targetUser = await db.query.users.findFirst({
+    where: and(eq(users.id, userId), eq(users.storeId, storeId)),
+  });
+
+  if (!targetUser) {
+    throw new AuthError("User not found.", "USER_NOT_FOUND");
+  }
+
+  if (targetUser.role === "owner") {
+    throw new AuthError("Store Owners cannot be deleted.", "FORBIDDEN");
+  }
+
+  await db.delete(users).where(eq(users.id, userId));
+  return { id: userId, email: targetUser.email };
+}
+

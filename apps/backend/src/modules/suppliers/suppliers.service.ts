@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { db } from "../../db/client";
 import { suppliers } from "../../db/schema";
 import type { CreateSupplierInput, UpdateSupplierInput } from "./suppliers.schema";
@@ -87,7 +87,7 @@ function isUniqueConstraintErrorSP(err: unknown, constraintName: string): boolea
 
 export async function listSuppliers(storeId: string) {
   return db.query.suppliers.findMany({
-    where: eq(suppliers.storeId, storeId),
+    where: and(eq(suppliers.storeId, storeId), isNull(suppliers.deletedAt)),
     orderBy: (suppliers, { asc }) => [asc(suppliers.name)],
   });
 }
@@ -101,15 +101,16 @@ export async function updateSupplier(storeId: string, supplierId: string, input:
   const [supplier] = await db
     .update(suppliers)
     .set({ ...input, updatedAt: new Date() })
-    .where(and(eq(suppliers.id, supplierId), eq(suppliers.storeId, storeId)))
+    .where(and(eq(suppliers.id, supplierId), eq(suppliers.storeId, storeId), isNull(suppliers.deletedAt)))
     .returning();
   return supplier ?? null;
 }
 
 export async function deleteSupplier(storeId: string, supplierId: string) {
   const [deleted] = await db
-    .delete(suppliers)
-    .where(and(eq(suppliers.id, supplierId), eq(suppliers.storeId, storeId)))
+    .update(suppliers)
+    .set({ deletedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(suppliers.id, supplierId), eq(suppliers.storeId, storeId), isNull(suppliers.deletedAt)))
     .returning();
   return deleted ?? null;
 }

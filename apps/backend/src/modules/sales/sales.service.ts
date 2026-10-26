@@ -6,9 +6,11 @@ import { logAuditEvent } from "../audit/audit.service";
 
 export class SalesError extends Error {
   code: string;
-  constructor(message: string, code: string) {
+  status: number;
+  constructor(message: string, code: string, status: number = 400) {
     super(message);
     this.code = code;
+    this.status = status;
   }
 }
 
@@ -70,6 +72,9 @@ export async function listSales(storeId: string, query: ListSalesQuery) {
       importId: sales.importId,
       saleDate: sales.saleDate,
       totalAmount: sales.totalAmount,
+      cgstAmount: sales.cgstAmount,
+      sgstAmount: sales.sgstAmount,
+      totalTax: sales.totalTax,
       createdAt: sales.createdAt,
     })
     .from(sales)
@@ -93,6 +98,9 @@ export async function listSales(storeId: string, query: ListSalesQuery) {
         quantity: saleItems.quantity,
         unitPrice: saleItems.unitPrice,
         lineTotal: saleItems.lineTotal,
+        hsnCode: saleItems.hsnCode,
+        gstRate: saleItems.gstRate,
+        taxAmount: saleItems.taxAmount,
       })
       .from(saleItems)
       .innerJoin(products, eq(saleItems.productId, products.id))
@@ -130,6 +138,9 @@ export async function listSales(storeId: string, query: ListSalesQuery) {
         quantity: item.quantity,
         unitPrice: Number(item.unitPrice),
         lineTotal: Number(item.lineTotal),
+        hsnCode: item.hsnCode ?? null,
+        gstRate: item.gstRate ? Number(item.gstRate) : 0,
+        taxAmount: item.taxAmount ? Number(item.taxAmount) : 0,
         returnedQuantity: returnSums[item.id] || 0,
       });
     }
@@ -174,6 +185,9 @@ export async function listSales(storeId: string, query: ListSalesQuery) {
       importId: s.importId,
       saleDate: s.saleDate,
       totalAmount: Number(s.totalAmount),
+      cgstAmount: Number(s.cgstAmount || 0),
+      sgstAmount: Number(s.sgstAmount || 0),
+      totalTax: Number(s.totalTax || 0),
       createdAt: s.createdAt,
       totalUnits: units,
       returnStatus,
@@ -219,6 +233,9 @@ export async function getSaleById(storeId: string, saleId: string) {
       quantity: saleItems.quantity,
       unitPrice: saleItems.unitPrice,
       lineTotal: saleItems.lineTotal,
+      hsnCode: saleItems.hsnCode,
+      gstRate: saleItems.gstRate,
+      taxAmount: saleItems.taxAmount,
     })
     .from(saleItems)
     .innerJoin(products, eq(saleItems.productId, products.id))
@@ -253,6 +270,9 @@ export async function getSaleById(storeId: string, saleId: string) {
       quantity: item.quantity,
       unitPrice: Number(item.unitPrice),
       lineTotal: Number(item.lineTotal),
+      hsnCode: item.hsnCode ?? null,
+      gstRate: item.gstRate ? Number(item.gstRate) : 0,
+      taxAmount: item.taxAmount ? Number(item.taxAmount) : 0,
       returnedQuantity: returnedQty,
       returns: itemReturns,
     };
@@ -272,6 +292,9 @@ export async function getSaleById(storeId: string, saleId: string) {
     importId: sale.importId,
     saleDate: sale.saleDate,
     totalAmount: Number(sale.totalAmount),
+    cgstAmount: Number(sale.cgstAmount || 0),
+    sgstAmount: Number(sale.sgstAmount || 0),
+    totalTax: Number(sale.totalTax || 0),
     createdAt: sale.createdAt,
     totalUnits,
     returnStatus,
@@ -289,6 +312,8 @@ export async function createSale(storeId: string, userId: string, input: CreateS
       id: products.id,
       name: products.name,
       sku: products.sku,
+      hsnCode: products.hsnCode,
+      gstRate: products.gstRate,
     })
     .from(products)
     .where(and(eq(products.storeId, storeId), inArray(products.id, productIds)));
@@ -297,18 +322,41 @@ export async function createSale(storeId: string, userId: string, input: CreateS
     throw new SalesError("One or more selected products do not belong to this store.", "INVALID_PRODUCT");
   }
 
-  // Calculate totals
+  const productMap = new Map(storeProducts.map((p) => [p.id, p]));
+
+  // Calculate totals and MRP-inclusive Indian GST
   let grandTotal = 0;
+  let totalTaxSum = 0;
+
   const processedItems = input.items.map((item) => {
+    const prod = productMap.get(item.productId);
     const lineTotal = Math.round(item.quantity * item.unitPrice * 100) / 100;
+    const gstRate = prod?.gstRate ? Number(prod.gstRate) : 0;
+    const hsnCode = prod?.hsnCode ?? null;
+
+    // Inclusive GST: Taxable Value = Line Total / (1 + Rate / 100)
+    let taxAmount = 0;
+    if (gstRate > 0) {
+      const taxableValue = lineTotal / (1 + gstRate / 100);
+      taxAmount = Math.round((lineTotal - taxableValue) * 100) / 100;
+    }
+
     grandTotal += lineTotal;
+    totalTaxSum += taxAmount;
+
     return {
       ...item,
       lineTotal,
+      hsnCode,
+      gstRate,
+      taxAmount,
     };
   });
 
   grandTotal = Math.round(grandTotal * 100) / 100;
+  totalTaxSum = Math.round(totalTaxSum * 100) / 100;
+  const cgstAmount = Math.round((totalTaxSum / 2) * 100) / 100;
+  const sgstAmount = Math.round((totalTaxSum - cgstAmount) * 100) / 100;
 
   return db.transaction(async (tx) => {
     // 1. Create sale record
@@ -318,6 +366,9 @@ export async function createSale(storeId: string, userId: string, input: CreateS
         storeId,
         saleDate,
         totalAmount: grandTotal.toString(),
+        cgstAmount: cgstAmount.toString(),
+        sgstAmount: sgstAmount.toString(),
+        totalTax: totalTaxSum.toString(),
       })
       .returning();
 
@@ -329,32 +380,41 @@ export async function createSale(storeId: string, userId: string, input: CreateS
         quantity: item.quantity,
         unitPrice: item.unitPrice.toString(),
         lineTotal: item.lineTotal.toString(),
+        hsnCode: item.hsnCode,
+        gstRate: item.gstRate.toString(),
+        taxAmount: item.taxAmount.toString(),
       });
 
-      // Update inventory current stock
-      const [currentInv] = await tx
-        .select()
-        .from(inventory)
-        .where(and(eq(inventory.storeId, storeId), eq(inventory.productId, item.productId)))
-        .limit(1);
+      // Atomic inventory deduction with race condition prevention (SQL atomic decrement)
+      const [deducted] = await tx
+        .update(inventory)
+        .set({
+          currentStock: sql`${inventory.currentStock} - ${item.quantity}`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(inventory.storeId, storeId),
+            eq(inventory.productId, item.productId),
+            sql`${inventory.currentStock} >= ${item.quantity}`
+          )
+        )
+        .returning();
 
-      const oldStock = currentInv?.currentStock ?? 0;
-      const newStock = oldStock - item.quantity;
+      if (!deducted) {
+        const [existing] = await tx
+          .select({ currentStock: inventory.currentStock })
+          .from(inventory)
+          .where(and(eq(inventory.storeId, storeId), eq(inventory.productId, item.productId)))
+          .limit(1);
 
-      if (currentInv) {
-        await tx
-          .update(inventory)
-          .set({
-            currentStock: newStock,
-            updatedAt: new Date(),
-          })
-          .where(eq(inventory.id, currentInv.id));
-      } else {
-        await tx.insert(inventory).values({
-          storeId,
-          productId: item.productId,
-          currentStock: newStock,
-        });
+        const available = existing?.currentStock ?? 0;
+        const prodName = productMap.get(item.productId)?.name || "Item";
+        throw new SalesError(
+          `Stock out! "${prodName}" kisi aur counter par bik gaya ya stock kam hai (Available: ${available}, Requested: ${item.quantity}).`,
+          "INSUFFICIENT_STOCK",
+          409
+        );
       }
 
       // Record movement ledger
@@ -376,6 +436,9 @@ export async function createSale(storeId: string, userId: string, input: CreateS
       entityId: sale.id,
       details: {
         totalAmount: grandTotal,
+        cgstAmount,
+        sgstAmount,
+        totalTax: totalTaxSum,
         itemsCount: input.items.length,
         saleDate,
       },
@@ -386,6 +449,9 @@ export async function createSale(storeId: string, userId: string, input: CreateS
       storeId: sale.storeId,
       saleDate: sale.saleDate,
       totalAmount: grandTotal,
+      cgstAmount,
+      sgstAmount,
+      totalTax: totalTaxSum,
       itemsCount: input.items.length,
       createdAt: sale.createdAt,
     };

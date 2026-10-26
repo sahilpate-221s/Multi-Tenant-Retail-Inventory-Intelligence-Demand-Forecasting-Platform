@@ -1,9 +1,18 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/authContext";
 import LoadingState from "./states/LoadingState";
 
+const CASHIER_ALLOWED_PREFIXES = [
+  "/pos",
+  "/sales",
+  "/khata",
+  "/inventory",
+  "/notifications",
+];
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -18,6 +27,16 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/" replace />;
+  }
+
+  // Cashier role boundary: Cashiers can only access counter & shelf check screens
+  if (user.role === "cashier") {
+    const isAllowed = CASHIER_ALLOWED_PREFIXES.some((prefix) =>
+      location.pathname.startsWith(prefix)
+    );
+    if (!isAllowed) {
+      return <Navigate to="/pos" replace />;
+    }
   }
 
   return <>{children}</>;

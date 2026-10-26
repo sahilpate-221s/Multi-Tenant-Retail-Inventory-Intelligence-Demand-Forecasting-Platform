@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { requireAuth } from "../auth/auth.middleware";
+import { requireAuth, requireOwner } from "../auth/auth.middleware";
 import { getCategories, postCategory, patchCategory, removeCategory } from "./categories.controller";
 
 const router = Router();
@@ -7,8 +7,8 @@ const router = Router();
 router.use(requireAuth); // every route below requires authentication
 
 router.get("/", getCategories);
-router.post("/", postCategory);
-router.patch("/:id", patchCategory);
-router.delete("/:id", removeCategory);
+router.post("/", requireOwner, postCategory);
+router.patch("/:id", requireOwner, patchCategory);
+router.delete("/:id", requireOwner, removeCategory);
 
 export default router;

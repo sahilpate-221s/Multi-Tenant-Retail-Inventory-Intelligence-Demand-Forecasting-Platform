@@ -64,3 +64,18 @@ export function useCreateReturn() {
     },
   });
 }
+
+export function useProcessReturn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: import("../lib/types").ProcessReturnInput) =>
+      apiClient.post<import("../lib/types").ProcessReturnResult>("/api/returns/process", input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sales"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+  });
+}

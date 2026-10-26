@@ -17,6 +17,7 @@ export const stores = pgTable("stores", {
   name: varchar("name", { length: 255 }).notNull(),
   timezone: varchar("timezone", { length: 100 }).notNull().default("UTC"),
   currency: varchar("currency", { length: 10 }).notNull().default("INR"),
+  gstin: varchar("gstin", { length: 20 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -51,6 +52,7 @@ export const categories = pgTable("categories", {
     .notNull()
     .references(() => stores.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -71,7 +73,10 @@ export const products = pgTable(
     barcode: varchar("barcode", { length: 100 }),
     costPrice: numeric("cost_price", { precision: 10, scale: 2 }).notNull(),
     sellingPrice: numeric("selling_price", { precision: 10, scale: 2 }).notNull(),
+    hsnCode: varchar("hsn_code", { length: 20 }),
+    gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).default("0.00"),
     isActive: boolean("is_active").notNull().default(true),
+    deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
   },
@@ -92,6 +97,7 @@ export const suppliers = pgTable("suppliers", {
   contactEmail: varchar("contact_email", { length: 255 }),
   contactPhone: varchar("contact_phone", { length: 50 }),
   reliabilityNotes: varchar("reliability_notes", { length: 500 }),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -192,6 +198,9 @@ export const sales = pgTable(
     importId: uuid("import_id").references(() => imports.id, { onDelete: "set null" }),
     saleDate: date("sale_date").notNull(),
     totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+    cgstAmount: numeric("cgst_amount", { precision: 12, scale: 2 }).default("0.00"),
+    sgstAmount: numeric("sgst_amount", { precision: 12, scale: 2 }).default("0.00"),
+    totalTax: numeric("total_tax", { precision: 12, scale: 2 }).default("0.00"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({
@@ -215,6 +224,9 @@ export const saleItems = pgTable(
     quantity: integer("quantity").notNull(),
     unitPrice: numeric("unit_price", { precision: 10, scale: 2 }).notNull(),
     lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
+    hsnCode: varchar("hsn_code", { length: 20 }),
+    gstRate: numeric("gst_rate", { precision: 5, scale: 2 }).default("0.00"),
+    taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0.00"),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
   (table) => ({
@@ -235,6 +247,8 @@ export const returns = pgTable("returns", {
     .references(() => saleItems.id, { onDelete: "cascade" }),
   quantity: integer("quantity").notNull(),
   reason: varchar("reason", { length: 255 }),
+  refundAmount: numeric("refund_amount", { precision: 12, scale: 2 }).default("0.00"),
+  refundMode: varchar("refund_mode", { length: 50 }).default("cash"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

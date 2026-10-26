@@ -23,6 +23,8 @@ const productSchema = z.object({
     .string()
     .min(1, "Selling price is required")
     .refine((v) => !isNaN(Number(v)) && Number(v) >= 0, "Must be a non-negative number"),
+  hsnCode: z.string().max(20).optional(),
+  gstRate: z.string().optional(),
   initialStock: z
     .string()
     .optional()
@@ -103,6 +105,8 @@ function ProductFormModal({ product, onClose }: Props) {
       supplierId: "",
       costPrice: product?.costPrice ? String(product.costPrice) : "",
       sellingPrice: product?.sellingPrice ? String(product.sellingPrice) : "",
+      hsnCode: product?.hsnCode ?? "",
+      gstRate: product?.gstRate !== undefined && product?.gstRate !== null ? String(product.gstRate) : "18",
       initialStock: "0",
       minStock: "5",
       isActive: product?.isActive ?? true,
@@ -123,6 +127,8 @@ function ProductFormModal({ product, onClose }: Props) {
         categoryId: values.categoryId || undefined,
         costPrice: Number(values.costPrice),
         sellingPrice: Number(values.sellingPrice),
+        hsnCode: values.hsnCode || null,
+        gstRate: values.gstRate ? Number(values.gstRate) : 0,
         isActive: values.isActive ?? true,
       };
 
@@ -304,6 +310,43 @@ function ProductFormModal({ product, onClose }: Props) {
                 </span>
               </div>
             )}
+
+            {/* Indian GST Compliance */}
+            <div className="p-3 rounded-xl bg-white/[0.02] border border-white/8 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-[#d4a853] tracking-wider block">
+                  🇮🇳 INDIAN GST COMPLIANCE
+                </span>
+                <span className="text-[10px] text-[#71717a]">MRP-Inclusive Tax</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase text-[#71717a] font-semibold block mb-1">
+                    GST TAX SLAB
+                  </label>
+                  <select
+                    {...register("gstRate")}
+                    className="w-full bg-[#0a0a0c] border border-white/10 focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none transition-colors cursor-pointer text-xs"
+                  >
+                    <option value="0">0% — Nil GST (Milk, Atta, Dal, Salt)</option>
+                    <option value="5">5% — Staples (Oil, Sugar, Tea)</option>
+                    <option value="12">12% — Processed (Butter, Cheese, Chips)</option>
+                    <option value="18">18% — Standard FMCG (Biscuits, Soaps)</option>
+                    <option value="28">28% — Luxury / Aerated (Soft Drinks)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-[#71717a] font-semibold block mb-1">
+                    HSN / SAC CODE
+                  </label>
+                  <input
+                    {...register("hsnCode")}
+                    placeholder="e.g. 1905, 3401, 2202"
+                    className="w-full bg-[#0a0a0c] border border-white/10 focus:border-[#d4a853] rounded-lg px-3 py-2 text-[#e8e6e3] outline-none text-xs font-mono"
+                  />
+                </div>
+              </div>
+            </div>
 
             {/* Initial Stock & Safety Buffer */}
             {!isEditing && (

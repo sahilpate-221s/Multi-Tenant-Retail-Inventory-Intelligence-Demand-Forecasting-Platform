@@ -62,8 +62,12 @@ export default function AuthFlipCard({ initialMode = "login" }: AuthFlipCardProp
     setLoginError("");
     setLoginLoading(true);
     try {
-      await login(loginEmail, loginPassword);
-      navigate("/dashboard");
+      const loggedUser = await login(loginEmail, loginPassword);
+      if (loggedUser.role === "cashier") {
+        navigate("/pos");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setLoginError(err.message);

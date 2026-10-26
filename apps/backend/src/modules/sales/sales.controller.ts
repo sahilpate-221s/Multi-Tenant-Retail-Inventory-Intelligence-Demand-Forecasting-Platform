@@ -13,12 +13,15 @@ export async function getSales(req: Request, res: Response) {
 
   try {
     const result = await listSales(req.auth!.storeId, parsed.data);
+    const isCashier = req.auth?.role === "cashier";
     return res.status(200).json({
       success: true,
       data: {
         items: result.items,
         pagination: result.pagination,
-        metrics: result.metrics,
+        metrics: isCashier
+          ? { totalRevenue: 0, totalOrders: result.items.length, totalUnits: 0, avgOrderValue: 0 }
+          : result.metrics,
       },
     });
   } catch (err) {
@@ -64,7 +67,7 @@ export async function postSale(req: Request, res: Response) {
     return res.status(201).json({ success: true, data: sale });
   } catch (err) {
     if (err instanceof SalesError) {
-      return res.status(400).json({
+      return res.status(err.status || 400).json({
         success: false,
         error: { code: err.code, message: err.message },
       });

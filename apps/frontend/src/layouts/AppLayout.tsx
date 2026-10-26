@@ -63,43 +63,10 @@ function AppLayout() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
 
-  // Cashier Mode State (locks down store margins & intelligence from clerks)
-  const [isCashierMode, setIsCashierMode] = useState<boolean>(() => {
-    return localStorage.getItem("sp_cashier_mode") === "true";
-  });
-  const [showPinModal, setShowPinModal] = useState(false);
-  const [enteredPin, setEnteredPin] = useState("");
-  const [pinError, setPinError] = useState("");
-
-  const handleToggleCashier = (enable: boolean) => {
-    if (enable) {
-      localStorage.setItem("sp_cashier_mode", "true");
-      setIsCashierMode(true);
-      window.dispatchEvent(new Event("cashier-mode-changed"));
-      navigate("/pos");
-    } else {
-      setShowPinModal(true);
-      setEnteredPin("");
-      setPinError("");
-    }
-  };
-
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (enteredPin === "1234") {
-      localStorage.setItem("sp_cashier_mode", "false");
-      setIsCashierMode(false);
-      window.dispatchEvent(new Event("cashier-mode-changed"));
-      setShowPinModal(false);
-      setEnteredPin("");
-      setPinError("");
-    } else {
-      setPinError("Incorrect PIN. Default Store Owner PIN is 1234");
-    }
-  };
+  const isCashier = user?.role === "cashier";
 
   const displayedNavSections = useMemo(() => {
-    if (!isCashierMode) return navSections;
+    if (!isCashier) return navSections;
     return [
       {
         label: "COUNTER OPERATIONS",
@@ -113,8 +80,6 @@ function AppLayout() {
         label: "STORE LOOKUP",
         items: [
           { to: "/inventory", label: "Shelf Stock Check" },
-          { to: "/perishables", label: "Expiry & Batches" },
-          { to: "/audits", label: "Stock Audits" },
         ],
       },
       {
@@ -124,7 +89,7 @@ function AppLayout() {
         ],
       },
     ];
-  }, [isCashierMode]);
+  }, [isCashier]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -368,16 +333,14 @@ function AppLayout() {
             </div>
           </div>
 
-          {/* Middle: Cashier Mode Active Banner */}
-          {isCashierMode && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-[#d4a853]/15 border border-[#d4a853]/35 text-[#d4a853] text-xs font-mono font-bold animate-pulse">
-              <span>🔒 Cashier Counter Mode</span>
-              <button
-                onClick={() => handleToggleCashier(false)}
-                className="text-[10px] bg-[#d4a853] text-[#0c0c0e] px-2 py-0.5 rounded font-bold hover:bg-[#e8be66] transition-all ml-1 shadow-sm"
-              >
-                Unlock Owner
-              </button>
+          {/* Middle: Role Badge */}
+          {isCashier ? (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-amber-500/15 border border-amber-500/35 text-amber-300 text-xs font-mono font-bold">
+              <span>🛒 Cashier Counter View</span>
+            </div>
+          ) : (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-mono font-semibold">
+              <span>👑 Store Owner</span>
             </div>
           )}
 
@@ -390,14 +353,15 @@ function AppLayout() {
               <button
                 onClick={() => setSettingsOpen((prev) => !prev)}
                 id="nav-settings-dropdown-btn"
-                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-[#97979d] hover:text-[#e8e6e3] bg-[#14141a] hover:bg-[#1c1c24] border border-white/10 hover:border-[#d4a853]/40 transition-all shadow-sm active:scale-95"
-                title="Settings & Session"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium text-[#97979d] hover:text-[#e8e6e3] bg-[#14141a] hover:bg-[#1c1c24] border border-white/10 hover:border-[#d4a853]/40 transition-all shadow-sm active:scale-95 cursor-pointer"
+                title="Account & Session"
               >
-                <svg className="w-4 h-4 text-[#d4a853]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <span className="hidden sm:inline font-medium">Settings</span>
+                <div className="w-5 h-5 rounded-md bg-gradient-to-br from-[#d4a853] to-[#8c6b2d] flex items-center justify-center text-[10px] font-bold text-[#0c0c0e]">
+                  {userInitial}
+                </div>
+                <span className="hidden sm:inline font-medium">
+                  {isCashier ? "Cashier" : "Owner"}
+                </span>
                 <svg
                   className={`w-3 h-3 text-[#71717a] transition-transform duration-200 ${
                     settingsOpen ? "rotate-180 text-[#d4a853]" : ""
@@ -430,62 +394,77 @@ function AppLayout() {
                       <div className="text-[10px] text-[#71717a] truncate mt-0.5">
                         {user?.email}
                       </div>
+                      <div className="mt-1">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider ${
+                            isCashier
+                              ? "bg-amber-500/15 text-amber-300 border border-amber-500/30"
+                              : "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                          }`}
+                        >
+                          {isCashier ? "🛒 Cashier Account" : "👑 Owner (Full Access)"}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Actions list */}
                   <div className="py-1.5 space-y-0.5">
-                    <button
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        navigate("/settings");
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left"
-                    >
-                      <svg className="w-4 h-4 text-[#d4a853]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <div className="flex-1">
-                        <div className="font-semibold">Settings Page</div>
-                        <div className="text-[10px] text-[#71717a]">Organization, security & policies</div>
-                      </div>
-                    </button>
+                    {!isCashier ? (
+                      <>
+                        <button
+                          onClick={() => {
+                            setSettingsOpen(false);
+                            navigate("/settings");
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left cursor-pointer"
+                        >
+                          <svg className="w-4 h-4 text-[#d4a853]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <div className="flex-1">
+                            <div className="font-semibold">Settings</div>
+                            <div className="text-[10px] text-[#71717a]">Store setup & credentials</div>
+                          </div>
+                        </button>
 
-                    <button
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        navigate("/settings?tab=inventory");
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left"
-                    >
-                      <svg className="w-4 h-4 text-[#4aba7a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                      <div className="flex-1">
-                        <div className="font-semibold">Inventory Policies</div>
-                        <div className="text-[10px] text-[#71717a]">Buffer days & auto-reorder rules</div>
-                      </div>
-                    </button>
+                        <button
+                          onClick={() => {
+                            setSettingsOpen(false);
+                            navigate("/settings?tab=team");
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left cursor-pointer"
+                        >
+                          <span className="text-sm">👥</span>
+                          <div className="flex-1">
+                            <div className="font-semibold">Staff & Cashiers</div>
+                            <div className="text-[10px] text-[#71717a]">Manage cashier counter logins</div>
+                          </div>
+                        </button>
 
-                    {/* Cashier Mode Quick Toggle Button */}
-                    <button
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        handleToggleCashier(!isCashierMode);
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left"
-                    >
-                      <span className="text-base">{isCashierMode ? "🔑" : "🔒"}</span>
-                      <div className="flex-1">
-                        <div className="font-semibold text-xs">
-                          {isCashierMode ? "Unlock Owner Mode" : "Switch to Cashier Mode"}
-                        </div>
-                        <div className="text-[10px] text-[#71717a]">
-                          {isCashierMode ? "Enter PIN to access full store analytics" : "Lock counter to POS & hide cost margins"}
-                        </div>
+                        <button
+                          onClick={() => {
+                            setSettingsOpen(false);
+                            navigate("/settings?tab=inventory");
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#e8e6e3] hover:text-[#d4a853] hover:bg-white/[0.04] transition-colors text-left cursor-pointer"
+                        >
+                          <svg className="w-4 h-4 text-[#4aba7a]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                          </svg>
+                          <div className="flex-1">
+                            <div className="font-semibold">Inventory Policies</div>
+                            <div className="text-[10px] text-[#71717a]">Buffer days & auto-reorder rules</div>
+                          </div>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="px-3 py-2 text-[11px] text-[#97979d] bg-white/[0.02] rounded-xl border border-white/5">
+                        <span className="text-amber-400 font-semibold block mb-0.5">🔒 Restricted Access</span>
+                        Wholesale costs, margins & reports are protected by store owner.
                       </div>
-                    </button>
+                    )}
                   </div>
 
                   {/* Divider */}
@@ -501,7 +480,7 @@ function AppLayout() {
                         navigate("/", { replace: true });
                       }
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#f87171] hover:bg-[#d45a4a]/10 transition-colors text-left group"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-[#f87171] hover:bg-[#d45a4a]/10 transition-colors text-left group cursor-pointer"
                   >
                     <svg className="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -536,69 +515,6 @@ function AppLayout() {
           </div>
         </main>
       </div>
-
-      {/* Owner Mode Security PIN Verification Modal */}
-      {showPinModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 px-4 font-mono">
-          <div className="bg-[#141418] border border-white/10 rounded-2xl w-full max-w-sm p-6 shadow-2xl animate-in fade-in">
-            <div className="flex items-center justify-between pb-3 border-b border-white/6">
-              <h2 className="font-bold text-sm text-[#e8e6e3] flex items-center gap-2">
-                <span>🔑</span> Unlock Store Owner Mode
-              </h2>
-              <button
-                onClick={() => setShowPinModal(false)}
-                className="text-[#97979d] hover:text-[#e8e6e3]"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handlePinSubmit} className="mt-4 space-y-3">
-              <p className="text-xs text-[#97979d]">
-                Enter Store Owner PIN to restore executive dashboards, profit margins, and procurement controls.
-              </p>
-
-              <div>
-                <label className="text-[10px] text-[#71717a] uppercase block mb-1">
-                  SECURITY PIN (DEFAULT: 1234)
-                </label>
-                <input
-                  type="password"
-                  maxLength={6}
-                  autoFocus
-                  required
-                  value={enteredPin}
-                  onChange={(e) => setEnteredPin(e.target.value)}
-                  placeholder="••••"
-                  className="w-full bg-[#0a0a0d] border border-white/15 focus:border-[#d4a853] rounded-lg px-3 py-2 text-center text-lg tracking-widest text-[#e8e6e3] outline-none"
-                />
-              </div>
-
-              {pinError && (
-                <p className="text-xs text-[#d45a4a] bg-[#d45a4a]/10 p-2 rounded border border-[#d45a4a]/25">
-                  {pinError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-white/6">
-                <button
-                  type="button"
-                  onClick={() => setShowPinModal(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs text-[#97979d] hover:text-[#e8e6e3]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="bg-[#d4a853] hover:bg-[#e8be66] text-[#0c0c0e] font-bold text-xs px-4 py-1.5 rounded-lg transition-all shadow-md active:scale-95"
-                >
-                  Verify & Unlock
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

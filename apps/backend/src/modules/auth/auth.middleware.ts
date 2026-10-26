@@ -32,3 +32,23 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     });
   }
 }
+
+export function requireRole(allowedRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      return res.status(401).json({
+        success: false,
+        error: { code: "UNAUTHENTICATED", message: "Authentication required." },
+      });
+    }
+    if (!allowedRoles.includes(req.auth.role)) {
+      return res.status(403).json({
+        success: false,
+        error: { code: "FORBIDDEN", message: "Access restricted to Store Owner." },
+      });
+    }
+    next();
+  };
+}
+
+export const requireOwner = requireRole(["owner"]);

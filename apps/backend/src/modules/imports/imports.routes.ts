@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
-import { requireAuth } from "../auth/auth.middleware";
+import { requireAuth, requireOwner } from "../auth/auth.middleware";
 import { postPreview, postCommit, getImports, getImportById } from "./imports.controller";
 
 const upload = multer({
@@ -42,6 +42,7 @@ function handleUploadErrors(uploadMiddleware: ReturnType<typeof upload.single>) 
 
 const router = Router();
 router.use(requireAuth);
+router.use(requireOwner);
 
 router.post("/preview", handleUploadErrors(upload.single("file")), postPreview);
 router.post("/commit", handleUploadErrors(upload.single("file")), postCommit);

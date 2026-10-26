@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
-import { requireAuth } from "../auth/auth.middleware";
+import { requireAuth, requireOwner } from "../auth/auth.middleware";
 import {
   getInventory,
   postAdjustment,
@@ -50,12 +50,12 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/", getInventory);
-router.post("/adjust", postAdjustment);
+router.post("/adjust", requireOwner, postAdjustment);
 router.get("/:productId/history", getHistory);
-router.patch("/:productId/settings", patchSettings);
+router.patch("/:productId/settings", requireOwner, patchSettings);
 
 // Bulk restock CSV endpoints
-router.post("/bulk-restock/preview", handleUploadErrors(upload.single("file")), postBulkRestockPreview);
-router.post("/bulk-restock/commit", handleUploadErrors(upload.single("file")), postBulkRestockCommit);
+router.post("/bulk-restock/preview", requireOwner, handleUploadErrors(upload.single("file")), postBulkRestockPreview);
+router.post("/bulk-restock/commit", requireOwner, handleUploadErrors(upload.single("file")), postBulkRestockCommit);
 
 export default router;

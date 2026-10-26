@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { apiClient } from "./apiClient";
 import { setAccessTokenForClient } from "./apiClient";
 
-interface AuthUser {
+export interface AuthUser {
     id: string;
     email: string;
     storeId: string;
@@ -14,7 +14,9 @@ interface AuthContextValue {
     user: AuthUser | null;
     accessToken: string | null;
     isLoading: boolean;
-    login: (email: string, password: string) => Promise<void>;
+    isOwner: boolean;
+    isCashier: boolean;
+    login: (email: string, password: string) => Promise<AuthUser>;
     register: (storeName: string, email: string, password: string) => Promise<void>;
     logout: () => Promise<void>;
 }
@@ -59,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessTokenForClient(accessToken);
     }, [accessToken]);
 
-    async function login(email: string, password: string) {
+    async function login(email: string, password: string): Promise<AuthUser> {
         const data = await apiClient.post<{ accessToken: string; user: AuthUser }>(
             "/api/auth/login",
             { email, password },
@@ -68,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAccessToken(data.accessToken);
         setUser(data.user);
         localStorage.setItem("stockpilot_auth_user", JSON.stringify(data.user));
+        return data.user;
     }
 
     async function register(storeName: string, email: string, password: string) {
@@ -86,8 +89,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }
 
+    const isOwner = user?.role === "owner";
+    const isCashier = user?.role === "cashier";
+
     return (
-        <AuthContext.Provider value={{ user, accessToken, isLoading, login, register, logout }}>
+        <AuthContext.Provider value={{ user, accessToken, isLoading, isOwner, isCashier, login, register, logout }}>
             {children}
         </AuthContext.Provider>
     );
